@@ -3,9 +3,7 @@ from dotenv import load_dotenv
 from groq import Groq
 load_dotenv()
 client=Groq(api_key=os.getenv("GROQ_API_KEY"))
-response=client.chat.completions.create(
-    model="openai/gpt-oss-20b",
-    messages=[
+messages=[
         {
             "role":"system",
             "content": """
@@ -21,26 +19,28 @@ response=client.chat.completions.create(
             "content":"hello i'm a fresher i'm here to take interview"
         }
     ]
-)
-ai_question=response.choices[0].message.content
-print(f"\nInterviewer : {ai_question}")
-answer=input("Your answer :")
-response_evaluation=client.chat.completions.create(
-    model="openai/gpt-oss-20b",
-    messages=[
-        {
-            "role":"system",
-            "content":"you are a python interviewer for a fresher"
-        },
-        {
+print(f"Interview as been started (Type 'quit to exit)")
+while True:
+    try:
+        response=client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=messages
+        )
+        ai_response=response.choices[0].message.content
+        print(f"\nInterviewer Question : {ai_response}")
+        candidate_answer=input("Your Answer : ")
+        if candidate_answer.strip().lower()=="quit":
+            print("Ending the Interviiew GoodLuck!")
+            break
+        messages.append({
             "role":"assistant",
-            "content":ai_question
-        },
-        {
+            "content":ai_response
+        })
+        messages.append({
             "role":"user",
-            "content":answer
-        }
+            "content":candidate_answer
+        })
 
-    ]
-)
-print(f"\nInterviewer : {response_evaluation.choices[0].message.content}")
+    except Exception as e:
+        print(f"An error occured:{e}")
+
