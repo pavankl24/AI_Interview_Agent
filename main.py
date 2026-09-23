@@ -20,8 +20,11 @@ messages=[
         }
     ]
 print(f"Interview as been started (Type 'quit to exit)")
+question_count=0
+max_question=5
 while True:
     try:
+        question_count+=1
         response=client.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=messages
@@ -31,6 +34,9 @@ while True:
         candidate_answer=input("Your Answer : ")
         if candidate_answer.strip().lower()=="quit":
             print("Ending the Interviiew GoodLuck!")
+            continue
+        elif question_count==max_question:
+            print("You answered Maximum questions")
             break
         messages.append({
             "role":"assistant",
