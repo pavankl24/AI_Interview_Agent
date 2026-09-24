@@ -69,7 +69,7 @@ while True:
         print(f"\nInterviewer Question : {ai_response}")
         candidate_answer=input("Your Answer : ")
         if candidate_answer.strip().lower()=="quit":
-            print("Ending the Interviiew GoodLuck!")
+            print("Ending the Interview GoodLuck!")
             break
         messages.append({
             "role":"assistant",
