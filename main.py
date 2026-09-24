@@ -13,9 +13,14 @@ rules:
 2,start with python basic questions
 3,gradually increase the difficulty level
 4,after the candidate answers,breifly evaluate the answer 
-5,Then ask the next question
-6,Do not give answer immediately
-7,Focus on python,OOP,SQL,AI/ML and software development
+5,After the candidate answers:
+- briefly evaluate their answer
+- mention what was correct or missing
+- then ask exactly one next question
+6,do not provide the complete answer or complete code unless all questions are over,
+when candidates give wrong answer
+7,don't repeat the question
+8,Focus on python,OOP,SQL,AI/ML and software development
 
     """
         },
