@@ -17,6 +17,7 @@ interview_types={
     "5":"FullStack"
 }
 interview_type=interview_types.get(choice,"python")
+max_question=int(input("How many maximum question do you want to attend :"))
 print(f"\n Starting {interview_type} Interview....\n")
 client=Groq(api_key=os.getenv("GROQ_API_KEY"))
 messages=[
@@ -56,9 +57,8 @@ The interview type is:
     ]
 print(f"Interview as been started (Type 'quit to exit)")
 question_count=0
-max_question=5
 def generate_report(messages):
-    report_prompt="""
+    report_prompt=f"""
 Based only on the interview conversation above, generate a final interview report.
 
 Interview type: {interview_type}
@@ -91,14 +91,26 @@ IMPORTANT:
         messages=report_messages
     )
     return response.choices[0].message.content
+asked_questions=[]
+question_instruction=f"""
+Ask the next {interview_type} Interview question
+Previously asked questions:{asked_questions}
+do not repeat previous questions.
+ask exact one new question """
 while True:
     try:
         question_count+=1
         response=client.chat.completions.create(
             model="openai/gpt-oss-20b",
-            messages=messages
+            messages=messages+[
+                {
+                    "role":"user",
+                    "content":{question_instruction}
+                }
+            ]
         )
         ai_response=response.choices[0].message.content
+        asked_questions.append(ai_response)
         print(f"\nInterviewer Question : {ai_response}")
         candidate_answer=input("Your Answer : ")
         if candidate_answer.strip().lower()=="quit":
