@@ -21,6 +21,7 @@ rules:
 when candidates give wrong answer
 7,don't repeat the question
 8,Focus on python,OOP,SQL,AI/ML and software development
+9,give each question to a question number 
 
     """
         },
@@ -43,6 +44,7 @@ Include:
 5,weakness.
 6,Areas to improve.
 7,overall feedback and overall score out of 10
+
 
 be honest interview the candidate based only on their genuine answer
 """
