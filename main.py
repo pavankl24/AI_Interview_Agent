@@ -59,18 +59,27 @@ question_count=0
 max_question=5
 def generate_report(messages):
     report_prompt="""
-based on the above interview conversation, generate final interview report
+Based only on the interview conversation above, generate a final interview report.
+
+Interview type: {interview_type}
+
 Include:
-1,Python knowledge score out of 10.
-2,OOP knowledge score out of 10.
-3,Problem solving knowledge out of 10.
-4,strengths.
-5,weakness.
-6,Areas to improve.
-7,overall feedback and overall score out of 10
 
+1. Interview Type
+2. Knowledge demonstrated in {interview_type}, scored out of 10.
+3. Problem-solving ability, scored out of 10 only if practical questions were asked.
+4. Strengths.
+5. Weaknesses.
+6. Areas to improve.
+7. Overall feedback.
+8. Overall score out of 10.
 
-be honest interview the candidate based only on their genuine answer
+IMPORTANT:
+- Evaluate ONLY what the candidate actually demonstrated.
+- Do not assume knowledge that was never tested.
+- Do not give scores for unrelated topics.
+- Do not invent strengths or weaknesses.
+- Be honest and concise.
 """
     report_messages=messages.copy()
     report_messages.append({
