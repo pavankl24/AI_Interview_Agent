@@ -56,7 +56,7 @@ The interview type is:
         }
     ]
 print(f"Interview as been started (Type 'quit to exit)")
-question_count=0
+
 def generate_report(messages):
     report_prompt=f"""
 Based only on the interview conversation above, generate a final interview report.
@@ -80,6 +80,11 @@ IMPORTANT:
 - Do not give scores for unrelated topics.
 - Do not invent strengths or weaknesses.
 - Be honest and concise.
+- Return your response ONLY as valid JSON.
+- The JSON must contain exactly two keys: "evaluation" and "next_question".
+- "evaluation" must contain the brief evaluation of the candidate's previous answer.
+- "next_question" must contain exactly one new interview question.
+- Do not include Markdown, code fences, or any text outside the JSON.
 """
     report_messages=messages.copy()
     report_messages.append({
@@ -91,26 +96,28 @@ IMPORTANT:
         messages=report_messages
     )
     return response.choices[0].message.content
+question_count=0
 asked_questions=[]
-question_instruction=f"""
-Ask the next {interview_type} Interview question
-Previously asked questions:{asked_questions}
-do not repeat previous questions.
-ask exact one new question """
 while True:
     try:
         question_count+=1
+        question_instruction=f"""
+    Ask the next {interview_type} Interview question
+    Previously asked questions:{asked_questions}
+    do not repeat previous questions.
+    ask exact one new question """
+
         response=client.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=messages+[
                 {
                     "role":"user",
-                    "content":{question_instruction}
+                    "content":question_instruction
                 }
             ]
         )
         ai_response=response.choices[0].message.content
-        asked_questions.append(ai_response)
+        print(ai_response)
         print(f"\nInterviewer Question : {ai_response}")
         candidate_answer=input("Your Answer : ")
         if candidate_answer.strip().lower()=="quit":

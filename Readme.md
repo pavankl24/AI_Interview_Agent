@@ -1,3 +1,4 @@
+version 2:            
              AI INTERVIEW AGENT
                     │
              Select interview
@@ -23,4 +24,17 @@
        │
        ↓
  Final Report 
- 
+version 3:
+                    Groq
+                     ↓
+             ┌───────────────┐
+             │ AI Response   │
+             └───────────────┘
+                ↓         ↓
+          Evaluation    Question
+                ↓         ↓
+          evaluations   questions
+                ↓         ↓
+                └────┬────┘
+                     ↓
+               Final Report
