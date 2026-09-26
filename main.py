@@ -48,6 +48,9 @@ IMPORTANT RULES:
 
 The interview type is:
 {interview_type}
+Return your response as valid JSON.
+The JSON must contain exactly two keys:
+"evaluation" and "next_question".
     """
         },
         {
@@ -85,6 +88,7 @@ IMPORTANT:
 - "evaluation" must contain the brief evaluation of the candidate's previous answer.
 - "next_question" must contain exactly one new interview question.
 - Do not include Markdown, code fences, or any text outside the JSON.
+- Return your response as valid JSON.
 """
     report_messages=messages.copy()
     report_messages.append({
@@ -114,7 +118,8 @@ while True:
                     "role":"user",
                     "content":question_instruction
                 }
-            ]
+            ],
+            response_format={"type":"json_object"}
         )
         ai_response=response.choices[0].message.content
         print(ai_response)
@@ -140,4 +145,5 @@ while True:
 
     except Exception as e:
         print(f"An error occured:{e}")
+        break
 
