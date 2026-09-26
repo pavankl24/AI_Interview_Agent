@@ -1,4 +1,5 @@
 import os
+import json
 from dotenv import load_dotenv
 from groq import Groq
 load_dotenv()
@@ -122,8 +123,10 @@ while True:
             response_format={"type":"json_object"}
         )
         ai_response=response.choices[0].message.content
-        print(ai_response)
-        print(f"\nInterviewer Question : {ai_response}")
+        data=json.loads(ai_response)
+        asked_questions.append(data["next_question"])
+        print(f"\nEvaluation: {data['evaluation']}")
+        print(f"\nNext_question: {data['next_question']}")
         candidate_answer=input("Your Answer : ")
         if candidate_answer.strip().lower()=="quit":
             print("Ending the Interview GoodLuck!")
