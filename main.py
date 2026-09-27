@@ -91,10 +91,29 @@ IMPORTANT:
 - Do not include Markdown, code fences, or any text outside the JSON.
 - Return your response as valid JSON.
 """
-    report_messages=messages.copy()
+    report_messages = [
+    {
+        "role": "system",
+        "content": f"""
+You are an interview report generator.
+
+Generate a final report for a {interview_type} interview.
+
+Do not act as the interviewer.
+Do not ask another interview question.
+Do not use the evaluation and next_question format.
+
+Analyze only what the candidate actually answered.
+"""
+    }
+]
+
     report_messages.append({
         "role":"user",
-        "content":report_prompt
+        "content":f"""
+here iz the interview conversation
+{messages[1:]}
+{report_prompt}"""
     })
     response=client.chat.completions.create(
         model="openai/gpt-oss-20b",
