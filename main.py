@@ -177,7 +177,21 @@ while True:
             report=generate_report(messages)
             report_data=json.loads(report)
             print("\n ======FINAL INTERVIEW REPORT======")
-            print(report_data)
+            print(f"\nInterview Type: {report_data['interview_type']}")
+            print(f"Knowledge Score: {report_data['knowledge_score']}/10")
+            print(f"Problem Solving Score: {report_data['problem_solving_score']}/10")
+            print("\nStrengths: ")
+            for strength in report_data["strengths"]:
+                print(f"-{strength}")
+            print(f"\nWeaknesses: ")
+            for weakness in report_data["weaknesses"]:
+                print(f"-{weakness}")
+            for area in report_data["area_to_improve"]:
+                print(f"-{area}")
+            print("\nOverall feedback")
+            print(report_data["overall_feedback"])
+            print(f"\nOverAll Score: {report_data["overall_score"]}/10")
+
             break
 
     except Exception as e:
