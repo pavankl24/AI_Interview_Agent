@@ -136,14 +136,34 @@ Generate the final report now.
     return response.choices[0].message.content
 question_count=0
 asked_questions=[]
+first_question=True
 while True:
     try:
         question_count+=1
-        question_instruction=f"""
-    Ask the next {interview_type} Interview question
-    Previously asked questions:{asked_questions}
-    do not repeat previous questions.
-    ask exact one new question """
+        if first_question:
+            question_instruction = f"""
+        Ask the first {interview_type} interview question.
+
+        There is no candidate answer yet.
+
+        Do not evaluate anything.
+        Return an empty evaluation.
+
+        Previously asked questions: {asked_questions}
+
+        Ask exactly one question.
+        Do not repeat previous questions.
+        """
+        else:
+            question_instruction = f"""
+            Evaluate the candidate's previous answer briefly.
+
+            Then ask exactly one new {interview_type} interview question.
+
+            Previously asked questions: {asked_questions}
+
+            Do not repeat previous questions.
+        """
 
         response=client.chat.completions.create(
             model="openai/gpt-oss-20b",
@@ -161,6 +181,7 @@ while True:
         print(f"\nEvaluation: {data['evaluation']}")
         print(f"\nNext_question: {data['next_question']}")
         candidate_answer=input("Your Answer : ")
+        first_question = False
         if candidate_answer.strip().lower()=="quit":
             print("Ending the Interview GoodLuck!")
             break
@@ -186,11 +207,11 @@ while True:
             print(f"\nWeaknesses: ")
             for weakness in report_data["weaknesses"]:
                 print(f"-{weakness}")
-            for area in report_data["area_to_improve"]:
+            for area in report_data["areas_to_improve"]:
                 print(f"-{area}")
             print("\nOverall feedback")
             print(report_data["overall_feedback"])
-            print(f"\nOverAll Score: {report_data["overall_score"]}/10")
+            print(f"\nOverAll Score: {report_data['overall_score']}/10")
 
             break
 
