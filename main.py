@@ -113,6 +113,21 @@ Analyze only what the candidate actually answered.
         "content":f"""
 here iz the interview conversation
 {messages[1:]}
+Generate the final report now.
+
+Return ONLY valid JSON using exactly these keys:
+
+{{
+    "interview_type": "...",
+    "knowledge_score": 0,
+    "problem_solving_score": 0,
+    "strengths": [],
+    "weaknesses": [],
+    "areas_to_improve": [],
+    "overall_feedback": "...",
+    "overall_score": 0
+}}
+
 {report_prompt}"""
     })
     response=client.chat.completions.create(
@@ -161,6 +176,7 @@ while True:
         if question_count==max_question:
             print("\n Interview Completed")
             report=generate_report(messages)
+            report_data=json.loads(report)
             print("\n ======FINAL INTERVIEW REPORT======")
             print(report)
             break
