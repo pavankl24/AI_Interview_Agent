@@ -99,11 +99,24 @@ You are an interview report generator.
 
 Generate a final report for a {interview_type} interview.
 
+Analyze only what the candidate actually answered.
+
 Do not act as the interviewer.
 Do not ask another interview question.
-Do not use the evaluation and next_question format.
+Do not provide evaluation and next_question.
 
-Analyze only what the candidate actually answered.
+Return ONLY valid JSON.
+
+The JSON must contain exactly these keys:
+
+interview_type
+knowledge_score
+problem_solving_score
+strengths
+weaknesses
+areas_to_improve
+overall_feedback
+overall_score
 """
     }
 ]
@@ -114,21 +127,7 @@ Analyze only what the candidate actually answered.
 here iz the interview conversation
 {messages[1:]}
 Generate the final report now.
-
-Return ONLY valid JSON using exactly these keys:
-
-{{
-    "interview_type": "...",
-    "knowledge_score": 0,
-    "problem_solving_score": 0,
-    "strengths": [],
-    "weaknesses": [],
-    "areas_to_improve": [],
-    "overall_feedback": "...",
-    "overall_score": 0
-}}
-
-{report_prompt}"""
+"""
     })
     response=client.chat.completions.create(
         model="openai/gpt-oss-20b",
@@ -178,7 +177,7 @@ while True:
             report=generate_report(messages)
             report_data=json.loads(report)
             print("\n ======FINAL INTERVIEW REPORT======")
-            print(report)
+            print(report_data)
             break
 
     except Exception as e:
