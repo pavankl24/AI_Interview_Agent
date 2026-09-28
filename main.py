@@ -62,35 +62,6 @@ The JSON must contain exactly two keys:
 print(f"Interview as been started (Type 'quit to exit)")
 
 def generate_report(messages):
-    report_prompt=f"""
-Based only on the interview conversation above, generate a final interview report.
-
-Interview type: {interview_type}
-
-Include:
-
-1. Interview Type
-2. Knowledge demonstrated in {interview_type}, scored out of 10.
-3. Problem-solving ability, scored out of 10 only if practical questions were asked.
-4. Strengths.
-5. Weaknesses.
-6. Areas to improve.
-7. Overall feedback.
-8. Overall score out of 10.
-
-IMPORTANT:
-- Evaluate ONLY what the candidate actually demonstrated.
-- Do not assume knowledge that was never tested.
-- Do not give scores for unrelated topics.
-- Do not invent strengths or weaknesses.
-- Be honest and concise.
-- Return your response ONLY as valid JSON.
-- The JSON must contain exactly two keys: "evaluation" and "next_question".
-- "evaluation" must contain the brief evaluation of the candidate's previous answer.
-- "next_question" must contain exactly one new interview question.
-- Do not include Markdown, code fences, or any text outside the JSON.
-- Return your response as valid JSON.
-"""
     report_messages = [
     {
         "role": "system",
@@ -214,7 +185,10 @@ while True:
             print("\n ======FINAL INTERVIEW REPORT======")
             print(f"\nInterview Type: {report_data['interview_type']}")
             print(f"Knowledge Score: {report_data['knowledge_score']}/10")
-            print(f"Problem Solving Score: {report_data['problem_solving_score']}/10")
+            if report_data["problem_solving_score"] is None:
+                print("Problem solving score:Not Assessed")
+            else:
+                print(f"Problem Solving Score: {report_data['problem_solving_score']}/10")
             print("\nStrengths: ")
             for strength in report_data["strengths"]:
                 print(f"-{strength}")
