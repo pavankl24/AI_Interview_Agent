@@ -94,7 +94,7 @@ IMPORTANT:
     report_messages = [
     {
         "role": "system",
-        "content": f"""
+            "content": f"""
 You are an interview report generator.
 
 Generate a final report for a {interview_type} interview.
@@ -117,6 +117,14 @@ weaknesses
 areas_to_improve
 overall_feedback
 overall_score
+Data type requirements:
+
+- strengths must be a JSON array of short strings.
+- weaknesses must be a JSON array of short strings.
+- areas_to_improve must be a JSON array of short strings.
+- knowledge_score must be a number from 0 to 10.
+- problem_solving_score must be a number from 0 to 10.
+- overall_score must be a number from 0 to 10.
 """
     }
 ]
@@ -178,8 +186,11 @@ while True:
         ai_response=response.choices[0].message.content
         data=json.loads(ai_response)
         asked_questions.append(data["next_question"])
-        print(f"\nEvaluation: {data['evaluation']}")
-        print(f"\nNext_question: {data['next_question']}")
+        if first_question:
+            print(f"\nquestion {question_count}: {data['next_question']}")
+        else:
+            print(f"\nEvaluation: {data['evaluation']}")
+            print(f"\nNext_question: {data['next_question']}")
         candidate_answer=input("Your Answer : ")
         first_question = False
         if candidate_answer.strip().lower()=="quit":
@@ -207,6 +218,7 @@ while True:
             print(f"\nWeaknesses: ")
             for weakness in report_data["weaknesses"]:
                 print(f"-{weakness}")
+            print(f"\n Areas to improve")
             for area in report_data["areas_to_improve"]:
                 print(f"-{area}")
             print("\nOverall feedback")
