@@ -123,7 +123,8 @@ Data type requirements:
 - weaknesses must be a JSON array of short strings.
 - areas_to_improve must be a JSON array of short strings.
 - knowledge_score must be a number from 0 to 10.
-- problem_solving_score must be a number from 0 to 10.
+- If no practical coding/problem-solving question was asked, problem_solving_score must be null.
+- If practical coding/problem-solving questions were asked, problem_solving_score must be a number from 0 to 10.
 - overall_score must be a number from 0 to 10.
 """
     }
@@ -207,6 +208,8 @@ while True:
         if question_count==max_question:
             print("\n Interview Completed")
             report=generate_report(messages)
+            print("\nRAW REPORT:")
+            print(report)
             report_data=json.loads(report)
             print("\n ======FINAL INTERVIEW REPORT======")
             print(f"\nInterview Type: {report_data['interview_type']}")
