@@ -190,7 +190,7 @@ while True:
             print(f"\nquestion {question_count}: {data['next_question']}")
         else:
             print(f"\nEvaluation: {data['evaluation']}")
-            print(f"\nNext_question: {data['next_question']}")
+            print(f"\nQuestion {question_count}: {data['next_question']}")
         candidate_answer=input("Your Answer : ")
         first_question = False
         if candidate_answer.strip().lower()=="quit":
