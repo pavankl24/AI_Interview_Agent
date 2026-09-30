@@ -63,8 +63,6 @@ while True:
             print("\nInterview Completed")
 
             report_data = report_generator.generate_report(agent.messages)
-            print("\nDEBUG REPORT DATA:")
-            print(report_data)
 
             print("\n====== FINAL INTERVIEW REPORT ======")
 
