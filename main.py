@@ -1,212 +1,65 @@
-import os
-import json
 from dotenv import load_dotenv
-from groq import Groq
+from agent import InterviewAgent
+
 load_dotenv()
+
 print("====== AI INTERVIEW AGENT ======")
 print("1,PYTHON")
 print("2,OOP")
 print("3,SQL")
 print("4,AI/ML")
 print("5,FULLSTACK")
-choice=input("Select Interview Agent: ")
-interview_types={
-    "1":"Python",
-    "2":"OOP",
-    "3":"Sql",
-    "4":"Ai/Ml",
-    "5":"FullStack"
+
+choice = input("Select Interview Agent: ")
+
+interview_types = {
+    "1": "Python",
+    "2": "OOP",
+    "3": "Sql",
+    "4": "Ai/Ml",
+    "5": "FullStack"
 }
-interview_type=interview_types.get(choice,"python")
-max_question=int(input("How many maximum question do you want to attend :"))
-print(f"\n Starting {interview_type} Interview....\n")
-client=Groq(api_key=os.getenv("GROQ_API_KEY"))
-messages=[
-        {
-            "role":"system",
-            "content": f"""
-You are a strict technical interviewer conducting a {interview_type} interview for a fresher.
 
-Your job is ONLY to:
-1. Ask one interview question.
-2. Wait for the candidate's answer.
-3. Evaluate the candidate's answer briefly.
-4. Then ask exactly ONE new question.
+interview_type = interview_types.get(choice, "Python")
 
-IMPORTANT RULES:
+max_question = int(input("How many maximum question do you want to attend : "))
 
-- NEVER answer your own question.
-- NEVER provide an example answer before the candidate responds.
-- NEVER provide the correct code unless explicitly asked for the answer.
-- If the candidate says "don't know", "idk", gives nonsense, or gives an incomplete answer, briefly say what was missing and move to the next question.
-- Do not turn the interview into a teaching session.
-- Do not repeat previously asked questions.
-- Start with basic questions and gradually increase difficulty.
-- Keep the questions relevant to {interview_type}.
-- Ask practical coding questions when appropriate.
-- Keep evaluations short, around 1-3 sentences.
-- Ask exactly one question at the end of every response.
+print(f"\nStarting {interview_type} Interview....\n")
 
-The interview type is:
-{interview_type}
-Return your response as valid JSON.
-The JSON must contain exactly two keys:
-"evaluation" and "next_question".
-    """
-        },
-        {
-            "role":"user",
-            "content":f"hello i'm a fresher i'm here to take {interview_type} interview"
-        }
-    ]
-print(f"Interview as been started (Type 'quit to exit)")
+agent = InterviewAgent(interview_type)
 
-def generate_report(messages):
-    report_messages = [
-    {
-        "role": "system",
-            "content": f"""
-You are an interview report generator.
+print("Interview has been started (Type 'quit' to exit)")
 
-Generate a final report for a {interview_type} interview.
+question_count = 0
+first_question = True
 
-Analyze only what the candidate actually answered.
-
-Do not act as the interviewer.
-Do not ask another interview question.
-Do not provide evaluation and next_question.
-
-Return ONLY valid JSON.
-
-The JSON must contain exactly these keys:
-
-interview_type
-knowledge_score
-problem_solving_score
-strengths
-weaknesses
-areas_to_improve
-overall_feedback
-overall_score
-Data type requirements:
-
-- strengths must be a JSON array of short strings.
-- weaknesses must be a JSON array of short strings.
-- areas_to_improve must be a JSON array of short strings.
-- knowledge_score must be a number from 0 to 10.
-- If no practical coding/problem-solving question was asked, problem_solving_score must be null.
-- Only give a problem_solving_score if the interview actually included a question requiring the candidate to write code, solve a programming problem, or design an algorithm.
-- Conceptual questions such as "What is a list?", "What is OOP?", or "What is mutable vs immutable?" do NOT count as problem-solving questions.
-- If no practical coding/problem-solving question was asked, problem_solving_score must be null.
-- If practical coding/problem-solving questions were asked, problem_solving_score must be a number from 0 to 10.
-"""
-    }
-]
-
-    report_messages.append({
-        "role":"user",
-        "content":f"""
-here iz the interview conversation
-{messages[1:]}
-Generate the final report now.
-"""
-    })
-    response=client.chat.completions.create(
-        model="openai/gpt-oss-20b",
-        messages=report_messages
-    )
-    return response.choices[0].message.content
-question_count=0
-asked_questions=[]
-first_question=True
 while True:
+
     try:
-        question_count+=1
+        question_count += 1
+
+        data, ai_response = agent.ask_question(first_question)
+
         if first_question:
-            question_instruction = f"""
-        Ask the first {interview_type} interview question.
-
-        There is no candidate answer yet.
-
-        Do not evaluate anything.
-        Return an empty evaluation.
-
-        Previously asked questions: {asked_questions}
-
-        Ask exactly one question.
-        Do not repeat previous questions.
-        """
-        else:
-            question_instruction = f"""
-            Evaluate the candidate's previous answer briefly.
-
-            Then ask exactly one new {interview_type} interview question.
-
-            Previously asked questions: {asked_questions}
-
-            Do not repeat previous questions.
-        """
-
-        response=client.chat.completions.create(
-            model="openai/gpt-oss-20b",
-            messages=messages+[
-                {
-                    "role":"user",
-                    "content":question_instruction
-                }
-            ],
-            response_format={"type":"json_object"}
-        )
-        ai_response=response.choices[0].message.content
-        data=json.loads(ai_response)
-        asked_questions.append(data["next_question"])
-        if first_question:
-            print(f"\nquestion {question_count}: {data['next_question']}")
+            print(f"\nQuestion {question_count}: {data['next_question']}")
         else:
             print(f"\nEvaluation: {data['evaluation']}")
             print(f"\nQuestion {question_count}: {data['next_question']}")
-        candidate_answer=input("Your Answer : ")
-        first_question = False
-        if candidate_answer.strip().lower()=="quit":
-            print("Ending the Interview GoodLuck!")
-            break
-        messages.append({
-            "role":"assistant",
-            "content":ai_response
-        })
-        messages.append({
-            "role":"user",
-            "content":candidate_answer
-        })
-        if question_count==max_question:
-            print("\n Interview Completed")
-            report=generate_report(messages)
-            print("\nRAW REPORT:")
-            print(report)
-            report_data=json.loads(report)
-            print("\n ======FINAL INTERVIEW REPORT======")
-            print(f"\nInterview Type: {report_data['interview_type']}")
-            print(f"Knowledge Score: {report_data['knowledge_score']}/10")
-            if report_data["problem_solving_score"] is None:
-                print("Problem solving score:Not Assessed")
-            else:
-                print(f"Problem Solving Score: {report_data['problem_solving_score']}/10")
-            print("\nStrengths: ")
-            for strength in report_data["strengths"]:
-                print(f"-{strength}")
-            print(f"\nWeaknesses: ")
-            for weakness in report_data["weaknesses"]:
-                print(f"-{weakness}")
-            print(f"\n Areas to improve")
-            for area in report_data["areas_to_improve"]:
-                print(f"-{area}")
-            print("\nOverall feedback")
-            print(report_data["overall_feedback"])
-            print(f"\nOverAll Score: {report_data['overall_score']}/10")
 
+        candidate_answer = input("Your Answer : ")
+
+        if candidate_answer.strip().lower() == "quit":
+            print("Ending the Interview. Good Luck!")
+            break
+
+        agent.add_answer(ai_response, candidate_answer)
+
+        first_question = False
+
+        if question_count == max_question:
+            print("\nInterview Completed")
             break
 
     except Exception as e:
-        print(f"An error occured:{e}")
+        print(f"An error occurred: {e}")
         break
-
