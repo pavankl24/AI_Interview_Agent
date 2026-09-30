@@ -95,8 +95,10 @@ Data type requirements:
 - areas_to_improve must be a JSON array of short strings.
 - knowledge_score must be a number from 0 to 10.
 - If no practical coding/problem-solving question was asked, problem_solving_score must be null.
+- Only give a problem_solving_score if the interview actually included a question requiring the candidate to write code, solve a programming problem, or design an algorithm.
+- Conceptual questions such as "What is a list?", "What is OOP?", or "What is mutable vs immutable?" do NOT count as problem-solving questions.
+- If no practical coding/problem-solving question was asked, problem_solving_score must be null.
 - If practical coding/problem-solving questions were asked, problem_solving_score must be a number from 0 to 10.
-- overall_score must be a number from 0 to 10.
 """
     }
 ]
