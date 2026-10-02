@@ -65,6 +65,7 @@ print("Interview has been started (Type 'quit' to exit)")
 
 question_count = 0
 first_question = True
+practical_questions_asked = False
 
 while True:
 
