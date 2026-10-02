@@ -16,8 +16,8 @@ choice = input("Select Interview Agent: ")
 interview_types = {
     "1": "Python",
     "2": "OOP",
-    "3": "Sql",
-    "4": "Ai/Ml",
+    "3": "SQL",
+    "4": "AI/ML",
     "5": "FullStack"
 }
 def display_report(report_data):
