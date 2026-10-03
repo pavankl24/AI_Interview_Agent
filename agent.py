@@ -40,7 +40,9 @@ The interview type is:
 Return your response as valid JSON.
 
 The JSON must contain exactly two keys:
-"evaluation" and "next_question".
+"evaluation","next_question" and is_practical.
+"is_practical" must be true if the question requires writing code, solving a programming problem, implementing something, or designing an algorithm.
+"is_practical" must be false for conceptual or theory questions.
 """
             },
             {
