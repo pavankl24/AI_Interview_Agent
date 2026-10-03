@@ -73,6 +73,20 @@ while True:
         question_count += 1
 
         data, ai_response = agent.ask_question(first_question)
+        question = data["next_question"]
+
+        if any(keyword in question.lower() for keyword in [
+            "write a program",
+            "write a function",
+            "write code",
+            "implement",
+            "coding",
+            "code",
+            "solve",
+            "algorithm",
+            "list comprehension"
+        ]):
+            practical_questions_asked = True
 
         if first_question:
             print(f"\nQuestion {question_count}: {data['next_question']}")
