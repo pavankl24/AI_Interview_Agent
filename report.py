@@ -70,4 +70,6 @@ Generate the final report now.
 
         report = response.choices[0].message.content
         result=json.loads(report)
+        if not practical_questions_asked:
+            report["problem_solving_score"]=None
         return result
