@@ -9,7 +9,7 @@ class InterviewReport:
         self.interview_type = interview_type
         self.client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-    def generate_report(self, messages):
+    def generate_report(self, messages,practical_questions_asked):
 
         report_messages = [
             {

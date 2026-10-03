@@ -96,7 +96,7 @@ while True:
 
             print("\nInterview Completed")
 
-            report_data = report_generator.generate_report(agent.messages)
+            report_data = report_generator.generate_report(agent.messages,practical_questions_asked)
             display_report(report_data)
 
             break
