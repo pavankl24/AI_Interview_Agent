@@ -69,9 +69,15 @@ Generate the final report now.
         )
 
         report = response.choices[0].message.content
-        print("\nDEBUG RAW REPORT")
-        print(repr(report))
-        result=json.loads(report)
+        report = report.strip()
+
+        if report.startswith("```json"):
+         report = report[len("```json"):]
+
+        if report.endswith("```"):
+            report = report[:-3]
+
+        result = json.loads(report.strip())
         if isinstance(result,str):
             result=json.loads(result)
         if not practical_questions_asked:
