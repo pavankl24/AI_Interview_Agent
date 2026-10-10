@@ -69,6 +69,8 @@ Generate the final report now.
         )
 
         report = response.choices[0].message.content
+        print("\nDEBUG RAW REPORT")
+        print(repr(report))
         result=json.loads(report)
         if isinstance(result,str):
             result=json.loads(result)
