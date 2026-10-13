@@ -74,7 +74,7 @@ while True:
 
         data, ai_response = agent.ask_question(first_question)
         if data["is_practical"]:
-            practical_questions_asked:True
+            practical_questions_asked=True
 
         if first_question:
             print(f"\nQuestion {question_count}: {data['next_question']}")
@@ -97,7 +97,6 @@ while True:
             print("\nInterview Completed")
 
             report_data = report_generator.generate_report(agent.messages,practical_questions_asked)
-            print("Report generated successfully")
             display_report(report_data)
 
             break
