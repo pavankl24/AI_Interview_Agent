@@ -69,17 +69,27 @@ Generate the final report now.
         )
 
         report = response.choices[0].message.content
+
+        if not report:
+            raise ValueError("The AI returned an empty interview report.")
+
         report = report.strip()
 
-        if report.startswith("```json"):
-         report = report[len("```json"):]
+        # Remove Markdown code fences if present
+        if report.startswith("```"):
+            report = report.split("\n", 1)[1]
+            report = report.rsplit("```", 1)[0].strip()
 
-        if report.endswith("```"):
-            report = report[:-3]
+        result = json.loads(report)
 
-        result = json.loads(report.strip())
-        if isinstance(result,str):
-            result=json.loads(result)
+        # Ensure the parsed report is a dictionary
+        if isinstance(result, str):
+            result = json.loads(result)
+
+        if not isinstance(result, dict):
+            raise ValueError("The AI report must be a JSON object.")
+
         if not practical_questions_asked:
-            report["problem_solving_score"]=None
+            result["problem_solving_score"] = None
+
         return result
