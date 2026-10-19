@@ -7,6 +7,7 @@ class InterviewAgent:
 
     def __init__(self, interview_type):
         self.interview_type = interview_type
+        self.last_ai_response = ""
         self.client = Groq(api_key=os.getenv("GROQ_API_KEY"))
         self.messages = [
             {
@@ -96,6 +97,7 @@ Do not repeat previous questions.
         data = json.loads(ai_response)
 
         self.asked_questions.append(data["next_question"])
+        self.last_ai_response = ai_response
 
         return data, ai_response
 
