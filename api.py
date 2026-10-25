@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
 from agent import InterviewAgent
@@ -8,44 +8,52 @@ from report import InterviewReport
 load_dotenv()
 
 app = FastAPI(title="AI Interview Agent API")
+
+sessions = {}
+
+
 @app.get("/")
 def home():
     return {"message": "AI Interview Agent API is running!"}
 
-# Store active interview sessions
-sessions = {}
-
-# ---------- Request Models ----------
 
 class StartInterviewRequest(BaseModel):
     interview_type: str
+    max_questions: int = Field(default=5, ge=1, le=50)
+
 
 class AnswerRequest(BaseModel):
     answer: str
 
-# ---------- Start Interview ----------
 
 @app.post("/interview/start")
 def start_interview(data: StartInterviewRequest):
 
-    agent = InterviewAgent(data.interview_type)
+    interview_type = data.interview_type.strip()
+
+    if not interview_type:
+        raise HTTPException(status_code=400, detail="Interview type is required.")
+
+    agent = InterviewAgent(interview_type)
 
     response, raw = agent.ask_question(True)
+    agent.last_ai_response = raw
 
     sessions["current"] = {
         "agent": agent,
-        "report": InterviewReport(data.interview_type),
+        "report": InterviewReport(interview_type),
         "question_count": 1,
-        "first_question": False,
-        "practical_questions": response["is_practical"]
+        "max_questions": data.max_questions,
+        "practical_questions": bool(response["is_practical"])
     }
 
     return {
         "question_number": 1,
-        "question": response["next_question"]
+        "max_questions": data.max_questions,
+        "question": response["next_question"],
+        "interview_completed": False
     }
 
-# ---------- Submit Answer ----------
 
 @app.post("/interview/answer")
 def submit_answer(data: AnswerRequest):
@@ -54,15 +62,26 @@ def submit_answer(data: AnswerRequest):
         raise HTTPException(status_code=404, detail="No active interview.")
 
     session = sessions["current"]
-
     agent = session["agent"]
 
-    previous_raw = agent.last_ai_response
+    agent.add_answer(agent.last_ai_response, data.answer)
+    if session["question_count"] >= session["max_questions"]:
 
-    agent.add_answer(previous_raw, data.answer)
+        report = session["report"].generate_report(
+            agent.messages,
+            session["practical_questions"]
+        )
+
+        del sessions["current"]
+
+        return {
+            "evaluation": "Interview completed.",
+            "interview_completed": True,
+            "report": report
+        }
+
 
     response, raw = agent.ask_question(False)
-
     agent.last_ai_response = raw
 
     session["question_count"] += 1
@@ -73,10 +92,11 @@ def submit_answer(data: AnswerRequest):
     return {
         "evaluation": response["evaluation"],
         "question_number": session["question_count"],
-        "question": response["next_question"]
+        "max_questions": session["max_questions"],
+        "question": response["next_question"],
+        "interview_completed": False
     }
 
-# ---------- Finish Interview ----------
 
 @app.post("/interview/finish")
 def finish_interview():
