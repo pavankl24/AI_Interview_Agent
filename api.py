@@ -1,10 +1,10 @@
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from typing import Literal
 from dotenv import load_dotenv
 
 from agent import InterviewAgent
@@ -12,7 +12,7 @@ from report import InterviewReport
 
 load_dotenv()
 
-app = FastAPI(title="AI Interview Agent API")
+app = FastAPI(title="Cogniv AI Interview Coach API")
 
 WEB_DIR = Path(__file__).parent / "web"
 
@@ -33,6 +33,9 @@ class StartInterviewRequest(BaseModel):
     interview_type: str
     max_questions: int = Field(default=5, ge=1, le=50)
     difficulty: Literal["Beginner", "Intermediate", "Advanced"] = "Intermediate"
+    interview_mode: Literal[
+        "Balanced", "Technical conversation", "Coding & problem solving"
+    ] = "Balanced"
 
 
 class AnswerRequest(BaseModel):
@@ -47,7 +50,7 @@ def start_interview(data: StartInterviewRequest):
     if not interview_type:
         raise HTTPException(status_code=400, detail="Interview type is required.")
 
-    agent = InterviewAgent(interview_type, data.difficulty)
+    agent = InterviewAgent(interview_type, data.difficulty, data.interview_mode)
 
     response, raw = agent.ask_question(True)
     agent.last_ai_response = raw
@@ -58,6 +61,7 @@ def start_interview(data: StartInterviewRequest):
         "question_count": 1,
         "max_questions": data.max_questions,
         "difficulty": data.difficulty,
+        "interview_mode": data.interview_mode,
         "practical_questions": bool(response["is_practical"])
     }
 

@@ -1,3 +1,7 @@
+# COGNIV AI
+### Think Beyond. Perform Better.
+*Intelligent Interview Experience*
+
 version 2:            
              AI INTERVIEW AGENT
                     │
@@ -54,9 +58,11 @@ version 3:
 ### Preview the UI
 
 1. Run `node web/preview-server.js` from this folder.
-2. Open `http://127.0.0.1:4173` in a browser.
+2. Open `http://127.0.0.1:4174` in a browser.
 
 This local preview uses scripted sample interview questions and a sample report so the full UI can be clicked through without Python or a Groq API key.
+
+Interview setup includes a saved format preference: **Balanced**, **Technical conversation**, or **Coding & problem solving**. The selected format changes the questions in both preview and live API sessions.
 
 ### Run with the live interview API
 

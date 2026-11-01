@@ -5,15 +5,23 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = __dirname;
-const port = Number(process.env.PORT || 4173);
-const questions = [
-  'Could you tell me what interests you about working with ' ,
-  'How would you explain a concept from this topic to a teammate who is new to it?',
-  'Can you walk me through how you would solve a small, practical problem in this area?',
-  'Tell me about a challenge you faced while learning or building something. What did you do?',
-  'What would you like to get better at next in this topic?'
-];
+const port = Number(process.env.PORT || 4174);
 let current = null;
+
+function questionFor(interview) {
+  const topics = {
+    Python: {talk:'What is the difference between a list and a tuple, and when would you use each?',code:'Write a Python function that returns the first character in a string that appears only once.'},
+    SQL: {talk:'When would you use a LEFT JOIN instead of an INNER JOIN?',code:'Write a SQL query to find the second-highest salary in an Employees table.'},
+    'AI / ML': {talk:'How would you explain the difference between supervised and unsupervised learning?',code:'Write pseudocode for splitting a dataset into training and validation sets.'},
+    'Full stack': {talk:'What happens between submitting a form and seeing the response in a web app?',code:'Write a small function that validates an email address before a form is submitted.'},
+    OOP: {talk:'Can you explain encapsulation and when it is useful?',code:'Design a small class for a bank account and describe its key methods.'},
+    JavaScript: {talk:'What is the difference between let, const, and var?',code:'Write a JavaScript function that removes duplicate values from an array.'}
+  };
+  const pair=topics[interview.topic]||{talk:`Which core idea in ${interview.topic} do you find most useful, and why?`,code:`Describe an algorithm or write a small solution for a practical ${interview.topic} problem.`};
+  const coding=interview.interviewMode==='Coding & problem solving'||(interview.interviewMode==='Balanced'&&interview.number%2===0);
+  const text=interview.interviewMode==='Technical conversation'?pair.talk:(coding?pair.code:pair.talk);
+  return {text,isPractical:interview.interviewMode==='Technical conversation'?false:coding};
+}
 
 function send(res, status, body, type='application/json; charset=utf-8') {
   res.writeHead(status, {'Content-Type':type, 'Cache-Control':'no-store'});
@@ -27,8 +35,9 @@ const server = http.createServer(async (req,res)=>{
   try {
     if (req.method==='POST' && url.pathname==='/interview/start') {
       const body=await readBody(req);
-      current={topic:String(body.interview_type||'Python'),limit:Math.max(1,Math.min(50,Number(body.max_questions)||5)),number:1,answers:[]};
-      return send(res,200,{question_number:1,max_questions:current.limit,question:`${questions[0]}${current.topic}?`,interview_completed:false});
+      current={topic:String(body.interview_type||'Python'),limit:Math.max(1,Math.min(50,Number(body.max_questions)||5)),number:1,answers:[],difficulty:body.difficulty||'Intermediate',interviewMode:body.interview_mode||'Balanced',sawPractical:false};
+      const first=questionFor(current);current.sawPractical=first.isPractical;
+      return send(res,200,{question_number:1,max_questions:current.limit,question:first.text,interview_completed:false});
     }
     if (req.method==='POST' && url.pathname==='/interview/answer') {
       const body=await readBody(req);
@@ -36,18 +45,18 @@ const server = http.createServer(async (req,res)=>{
       current.answers.push(String(body.answer||''));
       if(current.number>=current.limit){
         const score=Math.min(9.6,Math.max(5.8,6.2+current.answers.reduce((n,a)=>n+Math.min(a.trim().length,160)/220,0))).toFixed(1);
-        const report={interview_type:current.topic,knowledge_score:Number(score),problem_solving_score:null,overall_score:Number(score),strengths:['You shared your reasoning clearly.','You stayed engaged throughout the practice.'],weaknesses:['A couple of answers could use more detail.'],areas_to_improve:['Add a specific example to support your key points.','Pause briefly to structure longer answers.'],overall_feedback:'A thoughtful practice. Your answers showed curiosity and a solid foundation. With a little more detail and a concrete example or two, you’ll make an even stronger impression.'};
+        const report={interview_type:current.topic,knowledge_score:Number(score),problem_solving_score:current.sawPractical?Number(score):null,overall_score:Number(score),strengths:['You shared your reasoning clearly.','You stayed engaged throughout the practice.'],weaknesses:['A couple of answers could use more detail.'],areas_to_improve:['Add a specific example to support your key points.','Pause briefly to structure longer answers.'],overall_feedback:'A thoughtful practice. Your answers showed curiosity and a solid foundation. With a little more detail and a concrete example or two, you’ll make an even stronger impression.'};
         current=null;
         return send(res,200,{evaluation:'Interview completed.',interview_completed:true,report});
       }
       current.number++;
-      const q=questions[(current.number-1)%questions.length];
-      return send(res,200,{evaluation:'Thanks for sharing that. Let’s explore one more angle.',question_number:current.number,max_questions:current.limit,question:q.includes('this topic')?q.replace('this topic',current.topic):q,interview_completed:false});
+      const next=questionFor(current);current.sawPractical=current.sawPractical||next.isPractical;
+      return send(res,200,{evaluation:'Thanks for sharing that. Let’s explore one more angle.',question_number:current.number,max_questions:current.limit,question:next.text,interview_completed:false});
     }
     if(req.method==='POST'&&url.pathname==='/interview/finish'){
       if(!current)return send(res,404,{detail:'No active interview.'});
-      const topic=current.topic;current=null;
-      return send(res,200,{interview_type:topic,knowledge_score:7,problem_solving_score:null,overall_score:7,strengths:['You made a good start.'],weaknesses:['Try adding more detail.'],areas_to_improve:['Use a concrete example.'],overall_feedback:'Thanks for practicing today.'});
+      const topic=current.topic,practical=current.sawPractical;current=null;
+      return send(res,200,{interview_type:topic,knowledge_score:7,problem_solving_score:practical?7:null,overall_score:7,strengths:['You made a good start.'],weaknesses:['Try adding more detail.'],areas_to_improve:['Use a concrete example.'],overall_feedback:'Thanks for practicing today.'});
     }
     if(req.method!=='GET'&&req.method!=='HEAD')return send(res,405,{detail:'Method not allowed.'});
     const pathname=decodeURIComponent(url.pathname==='/'?'/index.html':url.pathname);
@@ -63,4 +72,4 @@ const server = http.createServer(async (req,res)=>{
     send(res,500,{detail:'Preview server error.'});
   }
 });
-server.listen(port,'127.0.0.1',()=>console.log(`Prepwise UI demo: http://127.0.0.1:${port}`));
+server.listen(port,'127.0.0.1',()=>console.log(`Cogniv AI UI demo: http://127.0.0.1:${port}`));
