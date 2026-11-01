@@ -44,7 +44,24 @@ version 3:
 ✅ V3 — Structured JSON
 ✅ V3 — Final report
 ⬜ V4 — Better scoring/report logic
-⬜ V5 — FastAPI backend
-⬜ V6 — React frontend
+✅ V5 — FastAPI backend
+✅ V6 — Responsive web frontend
 ⬜ V7 — MSSQL database
 ⬜ V8 — Authentication/history
+
+## Run the web app
+
+### Preview the UI
+
+1. Run `node web/preview-server.js` from this folder.
+2. Open `http://127.0.0.1:4173` in a browser.
+
+This local preview uses scripted sample interview questions and a sample report so the full UI can be clicked through without Python or a Groq API key.
+
+### Run with the live interview API
+
+1. Activate a Python virtual environment with the packages in `requirements.txt` installed.
+2. Start FastAPI from this folder: `uvicorn api:app --reload`
+3. Open `http://127.0.0.1:8000` in a browser.
+
+The web app uses the interview API for live question, answer, and report generation. Set `GROQ_API_KEY` in `.env` to use live interviews. The dashboard, profile preferences, and practice history are UI features saved in the browser on this device.

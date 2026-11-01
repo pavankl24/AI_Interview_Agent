@@ -5,15 +5,16 @@ from groq import Groq
 
 class InterviewAgent:
 
-    def __init__(self, interview_type):
+    def __init__(self, interview_type, difficulty="Intermediate"):
         self.interview_type = interview_type
+        self.difficulty = difficulty
         self.last_ai_response = ""
         self.client = Groq(api_key=os.getenv("GROQ_API_KEY"))
         self.messages = [
             {
                 "role": "system",
                 "content": f"""
-You are a strict technical interviewer conducting a {interview_type} interview for a fresher.
+You are a strict technical interviewer conducting a {interview_type} interview at {difficulty} difficulty.
 
 Your job is ONLY to:
 1. Ask one interview question.
@@ -30,6 +31,7 @@ IMPORTANT RULES:
 - Do not turn the interview into a teaching session.
 - Do not repeat previously asked questions.
 - Start with basic questions and gradually increase difficulty.
+- Match question complexity to the selected {difficulty} level.
 - Keep the questions relevant to {interview_type}.
 - Ask practical coding questions when appropriate.
 - Keep evaluations short, around 1-3 sentences.
@@ -37,6 +39,9 @@ IMPORTANT RULES:
 
 The interview type is:
 {interview_type}
+
+The difficulty is:
+{difficulty}
 
 Return your response as valid JSON.
 

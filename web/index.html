@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#080d1a">
+  <title>Prepwise — Interview practice, made personal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/welcome.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#home" aria-label="Prepwise home"><span class="brand-mark">✳</span><span>prepwise</span></a>
+      <div class="side-label">WORKSPACE</div>
+      <nav class="side-nav" aria-label="Main navigation">
+        <button class="nav-link active" data-page="home"><span>⌂</span>Home</button>
+        <button class="nav-link" data-page="setup"><span>✦</span>Practice</button>
+        <button class="nav-link" data-page="history"><span>◷</span>My progress</button>
+      </nav>
+      <div class="side-bottom"><div class="mentor-mini"><div class="mentor-icon">✳</div><div><b>Your AI coach</b><small>Ready when you are</small></div><span class="online-dot"></span></div><button class="nav-link" data-page="profile"><span>⚙</span>Settings</button></div>
+      <div class="sidebar-foot">A little practice goes a long way.</div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar"><button class="mobile-brand" data-page="home"><span class="brand-mark">✳</span> prepwise</button><div class="top-spacer"></div><span class="streak"><span>✦</span> <b id="streak-count">3</b> day streak</span><button class="avatar-button" data-page="profile" aria-label="Open profile">A</button></header>
+      <div id="toast" class="toast" role="status"></div>
+      <section id="page-welcome" class="page"></section>
+      <section id="page-home" class="page active"></section>
+      <section id="page-setup" class="page"></section>
+      <section id="page-interview" class="page"></section>
+      <section id="page-results" class="page"></section>
+      <section id="page-history" class="page"></section>
+      <section id="page-profile" class="page"></section>
+    </main>
+    <nav class="bottom-nav" aria-label="Mobile navigation"><button class="active" data-page="home"><span>⌂</span>Home</button><button data-page="setup"><span>✦</span>Practice</button><button data-page="history"><span>◷</span>Progress</button><button data-page="profile"><span>⚙</span>Profile</button></nav>
+  </div>
+  <script src="/app.js" defer></script>
+</body>
+</html>
