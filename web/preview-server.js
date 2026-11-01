@@ -72,4 +72,29 @@ const server = http.createServer(async (req,res)=>{
     send(res,500,{detail:'Preview server error.'});
   }
 });
+server.on('error',error=>{
+  if(error.code!=='EADDRINUSE'){
+    console.error(error);
+    process.exitCode=1;
+    return;
+  }
+
+  const address=`http://127.0.0.1:${port}`;
+  http.get(address,res=>{
+    let body='';
+    res.setEncoding('utf8');
+    res.on('data',chunk=>body+=chunk);
+    res.on('end',()=>{
+      if(res.statusCode===200&&body.includes('COGNIV AI')){
+        console.log(`Cogniv AI preview is already running: ${address}`);
+      }else{
+        console.error(`Port ${port} is already in use. Set PORT to another port and try again.`);
+        process.exitCode=1;
+      }
+    });
+  }).on('error',()=>{
+    console.error(`Port ${port} is already in use. Set PORT to another port and try again.`);
+    process.exitCode=1;
+  });
+});
 server.listen(port,'127.0.0.1',()=>console.log(`Cogniv AI UI demo: http://127.0.0.1:${port}`));

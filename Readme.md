@@ -61,6 +61,7 @@ version 3:
 2. Open `http://127.0.0.1:4174` in a browser.
 
 This local preview uses scripted sample interview questions and a sample report so the full UI can be clicked through without Python or a Groq API key.
+If the preview is already running, the command prints its URL and exits cleanly.
 
 Interview setup includes a saved format preference: **Balanced**, **Technical conversation**, or **Coding & problem solving**. The selected format changes the questions in both preview and live API sessions.
 
