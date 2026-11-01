@@ -1,0 +1,9 @@
+:root[data-theme="light"] .eyebrow,:root[data-theme="light"] .link-btn{color:#315fbb}
+:root[data-theme="light"] .hero-copy p,:root[data-theme="light"] .result-copy p{color:#465873}
+:root[data-theme="light"] .stat-icon,:root[data-theme="light"] .topic-icon{background:#e8effb;color:#315fbb}
+:root[data-theme="light"] .mentor-mini{background:#f6f8fc;border-color:var(--line)}
+:root[data-theme="light"] .mentor-mini small,:root[data-theme="light"] .history-result small{color:#53647e}
+:root[data-theme="light"] .stat-note.green{color:#21745f}
+:root[data-theme="light"] .stat-note.orange{color:#93611b}
+:root[data-theme="light"] .hero-card{background:linear-gradient(115deg,#e8effc,#f9fbff 78%)}
+:root[data-theme="light"] .visual-caption{color:#53647e}

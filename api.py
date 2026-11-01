@@ -15,16 +15,17 @@ load_dotenv()
 app = FastAPI(title="Cogniv AI Interview Coach API")
 
 WEB_DIR = Path(__file__).parent / "web"
+FRONTEND_DIR = WEB_DIR / "dist"
 
 
 @app.get("/app", include_in_schema=False)
 def web_app():
-    return FileResponse(WEB_DIR / "index.html")
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 
 @app.get("/", include_in_schema=False)
 def home():
-    return FileResponse(WEB_DIR / "index.html")
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 sessions = {}
 
@@ -134,4 +135,4 @@ def finish_interview():
     return report
 
 
-app.mount("/", StaticFiles(directory=WEB_DIR), name="web")
+app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="web")

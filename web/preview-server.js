@@ -1,12 +1,19 @@
 // Local UI preview server. Interview endpoints here are scripted demo data;
 // use `uvicorn api:app --reload` to connect the app to the live Groq-backed API.
-const http = require('node:http');
-const fs = require('node:fs');
-const path = require('node:path');
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = __dirname;
+const webDir = path.dirname(fileURLToPath(import.meta.url));
+const root = path.join(webDir, 'dist');
 const port = Number(process.env.PORT || 4174);
 let current = null;
+
+if (!fs.existsSync(path.join(root, 'index.html'))) {
+  console.error('Build the React app first with `npm install` and `npm run build`.');
+  process.exit(1);
+}
 
 function questionFor(interview) {
   const topics = {

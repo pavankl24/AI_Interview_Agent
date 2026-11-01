@@ -53,22 +53,28 @@ version 3:
 ⬜ V7 — MSSQL database
 ⬜ V8 — Authentication/history
 
-## Run the web app
+## Run the React + TypeScript app
 
-### Preview the UI
+Install the JavaScript dependencies once with `npm install`.
 
-1. Run `node web/preview-server.js` from this folder.
-2. Open `http://127.0.0.1:4174` in a browser.
+### Mock UI preview
 
-This local preview uses scripted sample interview questions and a sample report so the full UI can be clicked through without Python or a Groq API key.
+1. Build the frontend with `npm run build`.
+2. Run `npm run preview` from this folder.
+3. Open `http://127.0.0.1:4174` in a browser.
+
+This local preview uses scripted sample interview questions and a sample report.
 If the preview is already running, the command prints its URL and exits cleanly.
 
 Interview setup includes a saved format preference: **Balanced**, **Technical conversation**, or **Coding & problem solving**. The selected format changes the questions in both preview and live API sessions.
 
-### Run with the live interview API
+### Run with the live FastAPI interview API
 
-1. Activate a Python virtual environment with the packages in `requirements.txt` installed.
-2. Start FastAPI from this folder: `uvicorn api:app --reload`
-3. Open `http://127.0.0.1:8000` in a browser.
+1. Build the frontend with `npm run build`.
+2. Activate a Python virtual environment with the packages in `requirements.txt` installed and set `GROQ_API_KEY` in `.env`.
+3. Start FastAPI from this folder: `uvicorn api:app --reload`.
+4. Open `http://127.0.0.1:8000` in a browser.
+
+For frontend hot reload while FastAPI runs, use `npm run dev` and open `http://127.0.0.1:5173`.
 
 The web app uses the interview API for live question, answer, and report generation. Set `GROQ_API_KEY` in `.env` to use live interviews. The dashboard, profile preferences, and practice history are UI features saved in the browser on this device.
