@@ -28,6 +28,7 @@ const modes: { name: Mode; description: string; icon: string }[] = [
   { name: 'Coding & problem solving', description: 'Write code, solve problems, and explain your approach.', icon: '⌘' },
 ];
 const read = <T,>(key: string, fallback: T): T => { try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; } catch { return fallback; } };
+const getClientId = () => { let id = localStorage.getItem('cogniv.client-id'); if (!id) { id = crypto.randomUUID(); localStorage.setItem('cogniv.client-id', id); } return id; };
 
 function AreaChart({ sessions }: { sessions: Session[] }) {
   const data = [...sessions].slice(0, 8).reverse();
@@ -54,6 +55,7 @@ function AreaChart({ sessions }: { sessions: Session[] }) {
 export default function App() {
   const saved = read('cogniv.practice.preferences.v1', { limit: 5, level: 'Intermediate', focus: 'Balanced' as Mode });
   const [page, setPage] = useState<Page>('home');
+  const [clientId] = useState(getClientId);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => localStorage.getItem('cogniv.theme') === 'dark' ? 'dark' : 'light');
   const [setupStep, setSetupStep] = useState(1);
   const [topic, setTopic] = useState('Python');
@@ -76,6 +78,21 @@ export default function App() {
     localStorage.setItem('cogniv.theme', theme);
   }, [theme]);
   useEffect(() => { localStorage.setItem('prepwise.sessions.v1', JSON.stringify(sessions)); }, [sessions]);
+  useEffect(() => {
+    fetch(`/interview/history?client_id=${encodeURIComponent(clientId)}`)
+      .then(response => response.ok ? response.json() : null)
+      .then(data => {
+        if (!data?.configured || !Array.isArray(data.sessions)) return;
+        const savedSessions: Session[] = data.sessions.map((item: { topic: string; overall_score: number | null; created_at: string; max_questions: number; report: Report }) => ({
+          topic: item.topic,
+          score: Number(item.overall_score ?? item.report?.knowledge_score ?? 0),
+          date: new Intl.DateTimeFormat(undefined, { month: 'short', day: '2-digit' }).format(new Date(item.created_at)),
+          duration: `${item.max_questions} questions`,
+          report: item.report,
+        }));
+        setSessions(savedSessions);
+      }).catch(() => undefined);
+  }, [clientId]);
   useEffect(() => { localStorage.setItem('cogniv.practice.preferences.v1', JSON.stringify({ limit, level, focus: mode })); }, [limit, level, mode]);
   useEffect(() => { if (!notice) return; const timer = window.setTimeout(() => setNotice(''), 3200); return () => clearTimeout(timer); }, [notice]);
 
@@ -88,7 +105,7 @@ export default function App() {
   const startInterview = async () => {
     setWorking(true);
     try {
-      const result = await request('/interview/start', { interview_type: topic, max_questions: limit, difficulty: level, interview_mode: mode });
+      const result = await request('/interview/start', { client_id: clientId, interview_type: topic, max_questions: limit, difficulty: level, interview_mode: mode });
       setQuestionNo(result.question_number || 1); setMessages([{ role: 'coach', text: result.question }]); setPage('interview');
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Could not reach the interview service.'); }
     finally { setWorking(false); }

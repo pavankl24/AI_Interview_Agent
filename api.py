@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Literal
+from uuid import UUID
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
@@ -9,6 +10,7 @@ from dotenv import load_dotenv
 
 from agent import InterviewAgent
 from report import InterviewReport
+from database import get_interviews, is_supabase_configured, save_interview
 
 load_dotenv()
 
@@ -31,6 +33,7 @@ sessions = {}
 
 
 class StartInterviewRequest(BaseModel):
+    client_id: UUID
     interview_type: str
     max_questions: int = Field(default=5, ge=1, le=50)
     difficulty: Literal["Beginner", "Intermediate", "Advanced"] = "Intermediate"
@@ -63,6 +66,7 @@ def start_interview(data: StartInterviewRequest):
         "max_questions": data.max_questions,
         "difficulty": data.difficulty,
         "interview_mode": data.interview_mode,
+        "client_id": str(data.client_id),
         "practical_questions": bool(response["is_practical"])
     }
 
@@ -91,12 +95,23 @@ def submit_answer(data: AnswerRequest):
             session["practical_questions"]
         )
 
+        save_interview({
+            "client_id": session["client_id"],
+            "topic": session["agent"].interview_type,
+            "difficulty": session["difficulty"],
+            "interview_mode": session["interview_mode"],
+            "max_questions": session["max_questions"],
+            "overall_score": report.get("overall_score", report.get("knowledge_score")),
+            "report": report,
+        })
+
         del sessions["current"]
 
         return {
             "evaluation": "Interview completed.",
             "interview_completed": True,
-            "report": report
+            "report": report,
+            "history_persisted": is_supabase_configured(),
         }
 
 
@@ -130,9 +145,27 @@ def finish_interview():
         session["practical_questions"]
     )
 
+    save_interview({
+        "client_id": session["client_id"],
+        "topic": session["agent"].interview_type,
+        "difficulty": session["difficulty"],
+        "interview_mode": session["interview_mode"],
+        "max_questions": session["max_questions"],
+        "overall_score": report.get("overall_score", report.get("knowledge_score")),
+        "report": report,
+    })
+
     del sessions["current"]
 
     return report
+
+
+@app.get("/interview/history")
+def interview_history(client_id: UUID):
+    try:
+        return {"configured": is_supabase_configured(), "sessions": get_interviews(str(client_id))}
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Could not load saved interview history.") from error
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="web")

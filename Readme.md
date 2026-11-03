@@ -78,3 +78,13 @@ Interview setup includes a saved format preference: **Balanced**, **Technical co
 For frontend hot reload while FastAPI runs, use `npm run dev` and open `http://127.0.0.1:5173`.
 
 The web app uses the interview API for live question, answer, and report generation. Set `GROQ_API_KEY` in `.env` to use live interviews. The dashboard, profile preferences, and practice history are UI features saved in the browser on this device.
+
+### Supabase report history
+
+1. Create a Supabase project, then run `supabase/migrations/001_interview_sessions.sql` in its SQL Editor.
+2. Copy `.env.example` to `.env` and set `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, and `GROQ_API_KEY`.
+3. Install backend dependencies with `pip install -r requirements.txt`, rebuild the frontend, then start FastAPI with `uvicorn api:app --reload`.
+
+When the server Supabase settings are present, completed interview reports and their topic, difficulty, format, score, and question count are saved to Postgres and history loads from Supabase. Interview answers/transcripts are not stored. Without Supabase settings, the UI continues using browser-local history. Keep `SUPABASE_SECRET_KEY` only in the server `.env`; never put it in React or commit `.env`.
+
+The current history owner is a random browser ID, not a login. It is suitable for a single-user prototype, not secure multi-user access. Add Supabase Auth and user-scoped ownership/RLS policies before deploying for multiple users.
