@@ -123,6 +123,7 @@ export default function App() {
       if (result.interview_completed) {
         const finalReport = result.report as Report; setReport(finalReport);
         setSessions(current => [{ topic: finalReport.interview_type || topic, score: Number(finalReport.overall_score ?? finalReport.knowledge_score ?? 0), date: new Intl.DateTimeFormat(undefined, { month: 'short', day: '2-digit' }).format(new Date()), duration: 'Practice', report: finalReport }, ...current]);
+        if (result.history_persisted === false) setNotice('Your report is ready, but Supabase could not save it. Check SUPABASE_URL in .env.');
         setPage('results');
       } else { setQuestionNo(result.question_number); setMessages(current => [...current, { role: 'coach', text: result.question }]); }
     } catch (error) { setMessages(current => current.slice(0, -1)); setAnswer(submitted); setNotice(error instanceof Error ? error.message : 'Could not reach the interview service.'); }

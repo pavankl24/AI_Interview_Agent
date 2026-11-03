@@ -95,15 +95,19 @@ def submit_answer(data: AnswerRequest):
             session["practical_questions"]
         )
 
-        save_interview({
-            "client_id": session["client_id"],
-            "topic": session["agent"].interview_type,
-            "difficulty": session["difficulty"],
-            "interview_mode": session["interview_mode"],
-            "max_questions": session["max_questions"],
-            "overall_score": report.get("overall_score", report.get("knowledge_score")),
-            "report": report,
-        })
+        try:
+            save_interview({
+                "client_id": session["client_id"],
+                "topic": session["agent"].interview_type,
+                "difficulty": session["difficulty"],
+                "interview_mode": session["interview_mode"],
+                "max_questions": session["max_questions"],
+                "overall_score": report.get("overall_score", report.get("knowledge_score")),
+                "report": report,
+            })
+            history_persisted = is_supabase_configured()
+        except Exception:
+            history_persisted = False
 
         del sessions["current"]
 
@@ -111,7 +115,7 @@ def submit_answer(data: AnswerRequest):
             "evaluation": "Interview completed.",
             "interview_completed": True,
             "report": report,
-            "history_persisted": is_supabase_configured(),
+            "history_persisted": history_persisted,
         }
 
 
