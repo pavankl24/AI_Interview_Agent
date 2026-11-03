@@ -100,7 +100,12 @@ export default function App() {
   const navigate = (target: Page) => { setPage(target); if (target === 'setup') setSetupStep(1); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const request = async (path: string, body?: unknown) => {
     const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
-    const data = await response.json(); if (!response.ok) throw new Error(data.detail || 'The interview service returned an error.'); return data;
+    const responseText = await response.text();
+    let data: any;
+    try { data = JSON.parse(responseText); }
+    catch { throw new Error(response.ok ? 'The interview service returned an unreadable response.' : `Interview service error (${response.status}). Check the FastAPI terminal for details.`); }
+    if (!response.ok) throw new Error(data.detail || `Interview service error (${response.status}).`);
+    return data;
   };
   const startInterview = async () => {
     setWorking(true);
