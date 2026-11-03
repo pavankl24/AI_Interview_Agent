@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Literal
 from uuid import UUID
+import logging
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
@@ -30,6 +31,7 @@ def home():
     return FileResponse(FRONTEND_DIR / "index.html")
 
 sessions = {}
+logger = logging.getLogger(__name__)
 
 
 class StartInterviewRequest(BaseModel):
@@ -107,6 +109,7 @@ def submit_answer(data: AnswerRequest):
             })
             history_persisted = is_supabase_configured()
         except Exception:
+            logger.exception("Could not save completed interview report to Supabase")
             history_persisted = False
 
         del sessions["current"]
@@ -169,6 +172,7 @@ def interview_history(client_id: UUID):
     try:
         return {"configured": is_supabase_configured(), "sessions": get_interviews(str(client_id))}
     except Exception as error:
+        logger.exception("Could not load interview history from Supabase")
         raise HTTPException(status_code=503, detail="Could not load saved interview history.") from error
 
 
