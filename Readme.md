@@ -68,6 +68,8 @@ If the preview is already running, the command prints its URL and exits cleanly.
 
 Interview setup includes a saved format preference: **Balanced**, **Technical conversation**, or **Coding & problem solving**. The selected format changes the questions in both preview and live API sessions.
 
+The **Coding & problem solving** interview includes an indented code editor, stdin, and compiler output. The app uses Judge0 CE, fetches the available language list from the configured instance, and sends code to that instance for sandboxed execution. Configure `JUDGE0_API_URL` (defaults to `https://ce.judge0.com`) and, if required by your instance, `JUDGE0_API_KEY` in the server `.env`. Tab inserts two spaces and Enter continues indentation. The contribution heatmap and streak are based on completed interviews and their saved dates.
+
 ### Run with the live FastAPI interview API
 
 1. Build the frontend with `npm run build`.

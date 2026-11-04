@@ -1,6 +1,10 @@
 from pathlib import Path
 from typing import Literal
 import logging
+import asyncio
+import os
+
+import httpx
 
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.responses import FileResponse
@@ -44,6 +48,102 @@ class StartInterviewRequest(BaseModel):
 
 class AnswerRequest(BaseModel):
     answer: str
+
+
+class CompilerRequest(BaseModel):
+    language_id: int = Field(ge=1)
+    source_code: str = Field(min_length=1, max_length=20000)
+    stdin: str = Field(default="", max_length=5000)
+
+
+def judge0_url() -> str:
+    return os.getenv("JUDGE0_API_URL", "https://ce.judge0.com").rstrip("/")
+
+
+def judge0_headers() -> dict[str, str]:
+    headers = {"Content-Type": "application/json"}
+    api_key = os.getenv("JUDGE0_API_KEY")
+    if api_key:
+        headers["X-Auth-Token"] = api_key
+    return headers
+
+
+@app.get("/compiler/languages")
+async def compiler_languages(authorization: str | None = Header(default=None)):
+    authenticated_user(authorization)
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(10, connect=4)) as client:
+            response = await client.get(f"{judge0_url()}/languages/", headers=judge0_headers())
+            response.raise_for_status()
+            languages = response.json()
+            return [{"id": item["id"], "name": item["name"]} for item in languages if "id" in item and "name" in item]
+    except (httpx.HTTPError, ValueError, KeyError) as error:
+        logger.warning("Could not load compiler languages: %s", error)
+        raise HTTPException(status_code=503, detail="The compiler is unavailable right now.") from error
+
+
+@app.post("/compiler/execute")
+async def compiler_execute(data: CompilerRequest, authorization: str | None = Header(default=None)):
+    authenticated_user(authorization)
+    base_url = judge0_url()
+    headers = judge0_headers()
+    async with httpx.AsyncClient(timeout=httpx.Timeout(12, connect=4)) as client:
+        try:
+            submission = await client.post(
+                f"{base_url}/submissions/?base64_encoded=false&wait=false",
+                headers=headers,
+                json={
+                    "language_id": data.language_id,
+                    "source_code": data.source_code,
+                    "stdin": data.stdin,
+                    "cpu_time_limit": 2,
+                    "wall_time_limit": 5,
+                    "memory_limit": 128000,
+                    "max_file_size": 1024,
+                },
+            )
+            submission.raise_for_status()
+            token = submission.json().get("token")
+            if not token:
+                raise HTTPException(status_code=502, detail="The compiler did not return a submission ID.")
+
+            result = None
+            for _ in range(20):
+                await asyncio.sleep(0.4)
+                poll = await client.get(
+                    f"{base_url}/submissions/{token}/?base64_encoded=false&fields=status,stdout,stderr,compile_output,message,time,memory",
+                    headers=headers,
+                )
+                poll.raise_for_status()
+                result = poll.json()
+                status_id = (result.get("status") or {}).get("id")
+                if status_id not in (1, 2):
+                    break
+            if not result or (result.get("status") or {}).get("id") in (1, 2):
+                raise HTTPException(status_code=504, detail="The compiler took too long. Try again.")
+            return {
+                "status": (result.get("status") or {}).get("description", "Finished"),
+                "stdout": result.get("stdout") or "",
+                "stderr": result.get("stderr") or "",
+                "compile_output": result.get("compile_output") or "",
+                "message": result.get("message") or "",
+                "time": result.get("time"),
+                "memory": result.get("memory"),
+            }
+        except HTTPException:
+            raise
+        except httpx.HTTPStatusError as error:
+            logger.warning("Judge0 returned HTTP %s", error.response.status_code)
+            detail = "The compiler service rejected the request. Check its configuration and try again."
+            if error.response.status_code == 429:
+                detail = "The compiler is busy. Wait a moment and try again."
+            raise HTTPException(status_code=503, detail=detail) from error
+        except httpx.HTTPError as error:
+            logger.warning("Compiler request failed: %s", error)
+            raise HTTPException(status_code=503, detail="Could not reach the compiler. Try again shortly.") from error
+        except (ValueError, TypeError, AttributeError) as error:
+            logger.warning("Compiler returned an invalid response: %s", error)
+            raise HTTPException(status_code=503, detail="The compiler returned an invalid response. Try again shortly.") from error
 
 
 def authenticated_user(authorization: str | None = Header(default=None)) -> str:

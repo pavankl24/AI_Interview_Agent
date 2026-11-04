@@ -6,9 +6,19 @@ import { supabase } from './supabase';
 type Page = 'home' | 'setup' | 'interview' | 'results' | 'history' | 'profile';
 type Topic = { name: string; icon: string; desc: string };
 type Report = { interview_type?: string; overall_score?: number; knowledge_score?: number; problem_solving_score?: number | null; strengths?: string[]; weaknesses?: string[]; areas_to_improve?: string[]; overall_feedback?: string };
-type Session = { topic: string; score: number; date: string; duration: string; report?: Report };
+type Session = { topic: string; score: number; date: string; activityDate?: string; duration: string; report?: Report };
 type Message = { role: 'coach' | 'candidate'; text: string };
 type Mode = 'Balanced' | 'Technical conversation' | 'Coding & problem solving';
+type CompilerLanguage = { id: number; name: string };
+
+const starterLanguages: CompilerLanguage[] = [
+  { id: 71, name: 'Python (3.8.1)' }, { id: 63, name: 'JavaScript (Node.js 12.14.0)' },
+  { id: 54, name: 'C++ (GCC 9.2.0)' }, { id: 50, name: 'C (GCC 9.2.0)' },
+  { id: 62, name: 'Java (OpenJDK 13.0.1)' }, { id: 74, name: 'TypeScript (3.7.4)' },
+  { id: 60, name: 'Go (1.13.5)' }, { id: 73, name: 'Rust (1.40.0)' },
+  { id: 51, name: 'C# (Mono 6.6.0.161)' }, { id: 72, name: 'Ruby (2.7.0)' },
+  { id: 68, name: 'PHP (7.4.1)' }, { id: 78, name: 'Kotlin (1.3.70)' },
+];
 
 const topics: Topic[] = [
   { name: 'Python', icon: 'code', desc: 'Core concepts, data types & coding' },
@@ -29,6 +39,66 @@ const modes: { name: Mode; description: string; icon: string }[] = [
   { name: 'Coding & problem solving', description: 'Write code, solve problems, and explain your approach.', icon: 'terminal' },
 ];
 const read = <T,>(key: string, fallback: T): T => { try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; } catch { return fallback; } };
+
+function starterCode(language: CompilerLanguage) {
+  const name = language.name.toLowerCase();
+  if (name.includes('python')) return 'import sys\n\ndef solve():\n    values = sys.stdin.read().split()\n    print(values)\n\nsolve()';
+  if (name.includes('javascript')) return "const input = require('fs').readFileSync(0, 'utf8').trim();\nconsole.log(input);";
+  if (name.includes('typescript')) return "const input: string = '';\nconsole.log(input);";
+  if (name.includes('c++')) return '#include <iostream>\nusing namespace std;\n\nint main() {\n  cout << "Ready" << endl;\n  return 0;\n}';
+  if (/\bc \(/.test(name) || name.startsWith('c (')) return '#include <stdio.h>\n\nint main(void) {\n  printf("Ready\\n");\n  return 0;\n}';
+  if (name.includes('java')) return 'public class Main {\n  public static void main(String[] args) {\n    System.out.println("Ready");\n  }\n}';
+  if (name.includes('go')) return 'package main\n\nimport "fmt"\n\nfunc main() {\n  fmt.Println("Ready")\n}';
+  if (name.includes('rust')) return 'fn main() {\n    println!("Ready");\n}';
+  if (name.includes('c#') || name.includes('csharp')) return 'using System;\n\nclass Program {\n  static void Main() {\n    Console.WriteLine("Ready");\n  }\n}';
+  if (name.includes('ruby')) return 'input = STDIN.read.strip\nputs input';
+  if (name.includes('php')) return '<?php\n$input = trim(stream_get_contents(STDIN));\necho $input . PHP_EOL;';
+  if (name.includes('kotlin')) return 'fun main() {\n    println("Ready")\n}';
+  return '';
+}
+
+function dateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function practiceStreak(sessions: Session[]) {
+  const activeDates = new Set(sessions.map(session => session.activityDate).filter((date): date is string => Boolean(date)));
+  const today = new Date();
+  let cursor = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (!activeDates.has(dateKey(cursor))) cursor.setDate(cursor.getDate() - 1);
+  let count = 0;
+  while (activeDates.has(dateKey(cursor))) { count += 1; cursor.setDate(cursor.getDate() - 1); }
+  return count;
+}
+
+function ActivityHeatmap({ sessions }: { sessions: Session[] }) {
+  const counts = new Map<string, number>();
+  sessions.forEach(session => { if (session.activityDate) counts.set(session.activityDate, (counts.get(session.activityDate) || 0) + 1); });
+  const today = new Date();
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  start.setDate(start.getDate() - start.getDay() - 52 * 7);
+  const days = Array.from({ length: 53 * 7 }, (_, index) => {
+    const date = new Date(start); date.setDate(start.getDate() + index);
+    const key = dateKey(date);
+    return { key, date, count: counts.get(key) || 0 };
+  }).filter(day => day.date <= today);
+  const weeks: typeof days[] = [];
+  days.forEach((day, index) => { const week = Math.floor(index / 7); if (!weeks[week]) weeks[week] = []; weeks[week].push(day); });
+  const monthLabels = weeks.map(week => week[0]?.date.getDate() <= 7 ? week[0]?.date.toLocaleString(undefined, { month: 'short' }) : '');
+  const activeDays = [...counts.keys()].filter(key => key >= dateKey(start) && key <= dateKey(today)).length;
+  return <div className="activity-heatmap-wrap">
+    <div className="activity-months" aria-hidden="true">{monthLabels.map((label, index) => <span key={index}>{label}</span>)}</div>
+    <div className="activity-chart-row"><div className="activity-weekdays" aria-hidden="true"><span>Mon</span><span>Wed</span><span>Fri</span></div><div className="activity-grid" role="img" aria-label={`${activeDays} active practice days in the last year`}>
+      {weeks.map((week, weekIndex) => <div className="activity-week" key={weekIndex}>{Array.from({ length: 7 }, (_, dayIndex) => {
+        const day = week.find(item => item.date.getDay() === dayIndex);
+        if (!day) return <i key={dayIndex} className="activity-cell empty" />;
+        const level = day.count === 0 ? 0 : day.count === 1 ? 1 : day.count === 2 ? 2 : 3;
+        return <i key={dayIndex} className={`activity-cell level-${level}`} title={`${day.count} ${day.count === 1 ? 'practice' : 'practices'} on ${day.date.toLocaleDateString()}`} />;
+      })}</div>)}
+    </div></div>
+    <div className="activity-legend"><span>{activeDays} practice days</span><div><span>Less</span>{[0, 1, 2, 3].map(level => <i className={`activity-cell level-${level}`} key={level} />)}<span>More</span></div></div>
+  </div>;
+}
 
 function Icon({ name, size = 18 }: { name: string; size?: number }) {
   const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true as const };
@@ -95,6 +165,13 @@ export default function App() {
   const [answer, setAnswer] = useState('');
   const [report, setReport] = useState<Report | null>(null);
   const [notice, setNotice] = useState('');
+  const [compilerLanguages, setCompilerLanguages] = useState<CompilerLanguage[]>(starterLanguages);
+  const [compilerLanguage, setCompilerLanguage] = useState(71);
+  const [sourceCode, setSourceCode] = useState(starterCode(starterLanguages[0]));
+  const [stdin, setStdin] = useState('');
+  const [compilerOutput, setCompilerOutput] = useState('Run your code to see output here.');
+  const [compilerStatus, setCompilerStatus] = useState('Ready');
+  const [compilerBusy, setCompilerBusy] = useState(false);
   const name = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Alex';
   const [filter, setFilter] = useState('All');
 
@@ -125,16 +202,36 @@ export default function App() {
           topic: item.topic,
           score: Number(item.overall_score ?? item.report?.knowledge_score ?? 0),
           date: new Intl.DateTimeFormat(undefined, { month: 'short', day: '2-digit' }).format(new Date(item.created_at)),
+          activityDate: dateKey(new Date(item.created_at)),
           duration: `${item.max_questions} questions`,
           report: item.report,
         }));
         setSessions(savedSessions);
     })().catch(() => undefined);
   }, [user]);
+  useEffect(() => {
+    if (!user || !supabase) return;
+    void (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const response = await fetch('/compiler/languages', { headers: { Authorization: `Bearer ${data.session?.access_token || ''}` } });
+        if (!response.ok) return;
+        const languages: CompilerLanguage[] = await response.json();
+        if (languages.length) {
+          setCompilerLanguages(languages);
+          if (!languages.some(language => language.id === compilerLanguage)) {
+            const python = languages.find(language => language.name.toLowerCase().includes('python'));
+            if (python) setCompilerLanguage(python.id);
+          }
+        }
+      } catch { /* Keep the built-in language list available if the compiler is offline. */ }
+    })();
+  }, [user]);
   useEffect(() => { localStorage.setItem('cogniv.practice.preferences.v1', JSON.stringify({ limit, level, focus: mode })); }, [limit, level, mode]);
   useEffect(() => { if (!notice) return; const timer = window.setTimeout(() => setNotice(''), 3200); return () => clearTimeout(timer); }, [notice]);
 
   const average = useMemo(() => sessions.length ? (sessions.reduce((sum, item) => sum + item.score, 0) / sessions.length).toFixed(1) : '—', [sessions]);
+  const streak = useMemo(() => practiceStreak(sessions), [sessions]);
   const navigate = (target: Page) => { setPage(target); if (target === 'setup') setSetupStep(1); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const request = async (path: string, body?: unknown) => {
     const { data: sessionData } = await supabase!.auth.getSession();
@@ -145,6 +242,53 @@ export default function App() {
     catch { throw new Error(response.ok ? 'The interview service returned an unreadable response.' : `Interview service error (${response.status}). Check the FastAPI terminal for details.`); }
     if (!response.ok) throw new Error(responseData.detail || `Interview service error (${response.status}).`);
     return responseData;
+  };
+  const runCode = async () => {
+    if (compilerBusy || !sourceCode.trim()) return;
+    setCompilerBusy(true); setCompilerStatus('Running'); setCompilerOutput('');
+    try {
+      const result = await request('/compiler/execute', { language_id: compilerLanguage, source_code: sourceCode, stdin });
+      const output = result.compile_output || result.stderr || result.stdout || result.message || 'Program finished with no output.';
+      setCompilerOutput(output.trimEnd());
+      setCompilerStatus(result.status || 'Finished');
+    } catch (error) {
+      setCompilerOutput(error instanceof Error ? error.message : 'Could not run the code.');
+      setCompilerStatus('Unavailable');
+    } finally { setCompilerBusy(false); }
+  };
+  const handleCodeKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      const editor = event.currentTarget;
+      const start = editor.selectionStart; const end = editor.selectionEnd;
+      editor.setRangeText('  ', start, end, 'end'); setSourceCode(editor.value); return;
+    }
+    if (event.key === 'Enter') {
+      const editor = event.currentTarget; const start = editor.selectionStart;
+      const lineStart = sourceCode.lastIndexOf('\n', start - 1) + 1;
+      const line = sourceCode.slice(lineStart, start);
+      const currentIndent = line.match(/^\s*/)?.[0] || '';
+      const isClause = /^(else|elif|except|finally)\b/.test(line.trimStart());
+      const indentation = isClause ? currentIndent.slice(0, Math.max(0, currentIndent.length - 2)) : currentIndent;
+      const extra = /(?:[\[{(]|:\s*)$/.test(line.trimEnd()) ? '  ' : '';
+      event.preventDefault();
+      editor.setRangeText(`\n${indentation}${extra}`, start, editor.selectionEnd, 'end');
+      setSourceCode(editor.value);
+      return;
+    }
+    if (['}', ']', ')'].includes(event.key)) {
+      const editor = event.currentTarget; const start = editor.selectionStart;
+      const lineStart = sourceCode.lastIndexOf('\n', start - 1) + 1;
+      const lineEndAt = sourceCode.indexOf('\n', start);
+      const lineEnd = lineEndAt < 0 ? sourceCode.length : lineEndAt;
+      const before = sourceCode.slice(lineStart, start);
+      const after = sourceCode.slice(start, lineEnd);
+      if (/^\s*$/.test(before) && /^\s*$/.test(after) && before.length >= 2) {
+        event.preventDefault();
+        editor.setRangeText(`${before.slice(0, -2)}${event.key}`, lineStart, lineEnd, 'end');
+        setSourceCode(editor.value);
+      }
+    }
   };
   const startInterview = async () => {
     setWorking(true);
@@ -161,7 +305,7 @@ export default function App() {
       const result = await request('/interview/answer', { answer: submitted });
       if (result.interview_completed) {
         const finalReport = result.report as Report; setReport(finalReport);
-        setSessions(current => [{ topic: finalReport.interview_type || topic, score: Number(finalReport.overall_score ?? finalReport.knowledge_score ?? 0), date: new Intl.DateTimeFormat(undefined, { month: 'short', day: '2-digit' }).format(new Date()), duration: 'Practice', report: finalReport }, ...current]);
+        setSessions(current => [{ topic: finalReport.interview_type || topic, score: Number(finalReport.overall_score ?? finalReport.knowledge_score ?? 0), date: new Intl.DateTimeFormat(undefined, { month: 'short', day: '2-digit' }).format(new Date()), activityDate: dateKey(new Date()), duration: 'Practice', report: finalReport }, ...current]);
         if (result.history_persisted === false) setNotice('Your report is ready, but Supabase could not save it. Check SUPABASE_URL in .env.');
         setPage('results');
       } else { setQuestionNo(result.question_number); setMessages(current => [...current, { role: 'coach', text: result.question }]); }
@@ -191,13 +335,13 @@ export default function App() {
 
   return <div className="app-shell">
     <aside className="sidebar"><a className="brand" href="#home" onClick={event => { event.preventDefault(); navigate('home'); }}><span className="brand-mark"><img src={theme === 'light' ? lightLogo : logo} alt="" /></span><span>COGNIV AI</span></a><div className="side-label">WORKSPACE</div><nav className="side-nav" aria-label="Main navigation"><button className={`nav-link ${page === 'home' ? 'active' : ''}`} onClick={() => navigate('home')}><span className="nav-icon"><Icon name="home" /></span>Home</button><button className={`nav-link ${page === 'setup' ? 'active' : ''}`} onClick={() => navigate('setup')}><span className="nav-icon"><Icon name="play" /></span>Practice</button><button className={`nav-link ${page === 'history' ? 'active' : ''}`} onClick={() => navigate('history')}><span className="nav-icon"><Icon name="chart" /></span>My progress</button></nav><div className="side-bottom"><div className="mentor-mini"><div className="mentor-icon">AI</div><div><b>Your AI coach</b><small>Ready when you are</small></div><span className="online-dot" /></div><button className={`nav-link ${page === 'profile' ? 'active' : ''}`} onClick={() => navigate('profile')}><span className="nav-icon"><Icon name="settings" /></span>Settings</button></div><div className="sidebar-foot">Practice with purpose.</div></aside>
-    <main className="main-area"><header className="topbar"><button className="mobile-brand" onClick={() => navigate('home')}><span className="brand-mark"><img src={logo} alt="" /></span> COGNIV AI</button><div className="top-spacer" /><span className="streak"><span><Icon name="book" size={15} /></span> <b>{Math.min(7, sessions.length)}</b> practices</span><button className="theme-toggle" type="button" aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`} aria-pressed={theme === 'dark'} title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`} onClick={() => setTheme(current => current === 'light' ? 'dark' : 'light')}><span className="theme-icon" aria-hidden="true"><Icon name={theme === 'light' ? 'sun' : 'moon'} size={17} /></span></button><span className="user-email">{user?.email}</span><button className="signout-btn" onClick={() => supabase?.auth.signOut()}>Sign out</button><button className="avatar-button" onClick={() => navigate('profile')} aria-label="Open profile">{name[0]}</button></header>
+    <main className="main-area"><header className="topbar"><button className="mobile-brand" onClick={() => navigate('home')}><span className="brand-mark"><img src={logo} alt="" /></span> COGNIV AI</button><div className="top-spacer" /><span className="streak"><span><Icon name="book" size={15} /></span> <b>{streak}</b> day streak</span><button className="theme-toggle" type="button" aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`} aria-pressed={theme === 'dark'} title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`} onClick={() => setTheme(current => current === 'light' ? 'dark' : 'light')}><span className="theme-icon" aria-hidden="true"><Icon name={theme === 'light' ? 'sun' : 'moon'} size={17} /></span></button><span className="user-email">{user?.email}</span><button className="signout-btn" onClick={() => supabase?.auth.signOut()}>Sign out</button><button className="avatar-button" onClick={() => navigate('profile')} aria-label="Open profile">{name[0]}</button></header>
       {notice && <div className="toast show" role="alert">{notice}</div>}
-      {page === 'home' && <section className="page active dashboard-page"><div className="welcome-line"><div><div className="eyebrow">YOUR COACHING SPACE</div><h1>Good to see you, {name.split(' ')[0]}</h1><p>Good practice turns into quiet confidence.</p></div><button className="link-btn" onClick={() => navigate('history')}>View progress ↗</button></div><div className="hero-card"><div className="hero-copy"><div className="eyebrow">YOUR NEXT PRACTICE <span className="eyebrow-separator">/</span> 12 MIN</div><h2>Make your next answer your strongest.</h2><p>Choose a topic, find your level, and practice the way that works for you.</p><button className="primary-btn" onClick={() => navigate('setup')}>Set up practice <span>→</span></button></div><div className="hero-art"><div className="path-visual"><span className="path-caption">YOUR CAREER PATH</span><svg viewBox="0 0 250 150" aria-hidden="true"><path className="path-line" d="M18 122 C55 121 51 79 91 86 S132 113 155 61 S202 32 231 24"/><circle cx="18" cy="122" r="7" className="path-node complete"/><circle cx="91" cy="86" r="6" className="path-node complete"/><circle cx="155" cy="61" r="7" className="path-node current"/><circle cx="231" cy="24" r="6" className="path-node future"/></svg><div className="path-label"><b>Next stop</b><span>Interview ready</span></div></div></div></div><div className="stat-grid"><div className="stat-card"><div className="stat-top">Sessions completed <span className="stat-icon"><Icon name="clock" size={16} /></span></div><div className="stat-value">{sessions.length}</div><div className="stat-note">Every session is progress</div></div><div className="stat-card"><div className="stat-top">Average score <span className="stat-icon"><Icon name="chart" size={16} /></span></div><div className="stat-value">{average}<small> {average !== '—' ? '/ 10' : ''}</small></div><div className="stat-note">Keep your momentum going</div></div><div className="stat-card"><div className="stat-top">Practice streak <span className="stat-icon"><Icon name="book" size={16} /></span></div><div className="stat-value">{Math.min(7, sessions.length)}<small> days</small></div><div className="stat-note">Consistency builds confidence</div></div></div><div className="section-head"><h2>Recent sessions</h2><button className="link-btn" onClick={() => navigate('history')}>See all →</button></div><div className="session-list">{sessionCards}</div><div className="section-head"><h2>Your progress</h2><button className="link-btn" onClick={() => navigate('history')}>View progress →</button></div><div className="two-col"><div className="panel"><h3>Score over time</h3><p>Hover, tap, or focus a point to inspect a practice.</p>{homeChart}</div><div className="panel"><h3>Skills to grow</h3><p>Your focus areas at a glance</p>{['Communication', 'Technical knowledge', 'Problem solving'].map((item, i) => <div className="skill-row" key={item}><span>{item}</span><div className="skill-track"><i style={{ width: `${Math.max(35, Number(average === '—' ? 6.8 : average) * 10 - i * 7)}%` }} /></div><b>{Math.max(35, Number(average === '—' ? 6.8 : average) * 10 - i * 7)}%</b></div>)}</div></div></section>}
+      {page === 'home' && <section className="page active dashboard-page"><div className="welcome-line"><div><div className="eyebrow">YOUR COACHING SPACE</div><h1>Good to see you, {name.split(' ')[0]}</h1><p>Good practice turns into quiet confidence.</p></div><button className="link-btn" onClick={() => navigate('history')}>View progress ↗</button></div><div className="hero-card"><div className="hero-copy"><div className="eyebrow">YOUR NEXT PRACTICE <span className="eyebrow-separator">/</span> 12 MIN</div><h2>Make your next answer your strongest.</h2><p>Choose a topic, find your level, and practice the way that works for you.</p><button className="primary-btn" onClick={() => navigate('setup')}>Set up practice <span>→</span></button></div><div className="hero-art"><div className="path-visual"><span className="path-caption">YOUR CAREER PATH</span><svg viewBox="0 0 250 150" aria-hidden="true"><path className="path-line" d="M18 122 C55 121 51 79 91 86 S132 113 155 61 S202 32 231 24"/><circle cx="18" cy="122" r="7" className="path-node complete"/><circle cx="91" cy="86" r="6" className="path-node complete"/><circle cx="155" cy="61" r="7" className="path-node current"/><circle cx="231" cy="24" r="6" className="path-node future"/></svg><div className="path-label"><b>Next stop</b><span>Interview ready</span></div></div></div></div><div className="stat-grid"><div className="stat-card"><div className="stat-top">Sessions completed <span className="stat-icon"><Icon name="clock" size={16} /></span></div><div className="stat-value">{sessions.length}</div><div className="stat-note">Every session is progress</div></div><div className="stat-card"><div className="stat-top">Average score <span className="stat-icon"><Icon name="chart" size={16} /></span></div><div className="stat-value">{average}<small> {average !== '—' ? '/ 10' : ''}</small></div><div className="stat-note">Keep your momentum going</div></div><div className="stat-card"><div className="stat-top">Practice streak <span className="stat-icon"><Icon name="book" size={16} /></span></div><div className="stat-value">{streak}<small> days</small></div><div className="stat-note">Consecutive practice days</div></div></div><div className="section-head"><h2>Recent sessions</h2><button className="link-btn" onClick={() => navigate('history')}>See all →</button></div><div className="session-list">{sessionCards}</div><div className="section-head"><h2>Your progress</h2><button className="link-btn" onClick={() => navigate('history')}>View progress →</button></div><div className="two-col"><div className="panel"><h3>Score over time</h3><p>Hover, tap, or focus a point to inspect a practice.</p>{homeChart}</div><div className="panel"><h3>Skills to grow</h3><p>Your focus areas at a glance</p>{['Communication', 'Technical knowledge', 'Problem solving'].map((item, i) => <div className="skill-row" key={item}><span>{item}</span><div className="skill-track"><i style={{ width: `${Math.max(35, Number(average === '—' ? 6.8 : average) * 10 - i * 7)}%` }} /></div><b>{Math.max(35, Number(average === '—' ? 6.8 : average) * 10 - i * 7)}%</b></div>)}</div></div><div className="panel activity-panel"><div className="activity-heading"><div><h3>Practice activity</h3><p>Small sessions add up over time</p></div><strong>{streak} day streak</strong></div><ActivityHeatmap sessions={sessions} /></div></section>}
       {page === 'setup' && <section className="page active">{setupContent}</section>}
-      {page === 'interview' && <section className="page active"><div className="interview-shell"><div className="interview-top"><div className="coach-avatar">AI</div><div><b>{topic} practice</b><small>{mode} · {level}</small></div><div className="interview-progress"><b>Question {questionNo} of {limit}</b><div className="progress-track"><i style={{ width: `${questionNo / limit * 100}%` }} /></div></div></div><div className="chat-box">{messages.map((message, index) => <div className={`chat-message ${message.role === 'candidate' ? 'candidate' : ''}`} key={index}><div className="chat-face">{message.role === 'candidate' ? name[0] : 'AI'}</div><div className="bubble-wrap"><small>{message.role === 'candidate' ? name : 'Interviewer'}</small><div className="bubble">{message.text}</div></div></div>)}{working && <div className="chat-message"><div className="chat-face">AI</div><div className="bubble typing"><i /><i /><i /></div></div>}</div><form className="answer-form" onSubmit={submitAnswer}><textarea value={answer} onChange={event => setAnswer(event.target.value)} placeholder="Take your time. Type your answer here…" aria-label="Your answer" required /><button className="send-btn" aria-label="Send answer" disabled={working}>↑</button></form></div></section>}
+      {page === 'interview' && <section className="page active"><div className="interview-shell"><div className="interview-top"><div className="coach-avatar">AI</div><div><b>{topic} practice</b><small>{mode} · {level}</small></div><div className="interview-progress"><b>Question {questionNo} of {limit}</b><div className="progress-track"><i style={{ width: `${questionNo / limit * 100}%` }} /></div></div></div>{mode === 'Coding & problem solving' && <div className="coding-workbench"><div className="coding-heading"><div><h3>Code runner</h3><p>Tab and Enter keep indentation consistent</p></div><label>Language<select value={compilerLanguage} onChange={event => { const id = Number(event.target.value); const language = compilerLanguages.find(item => item.id === id); setCompilerLanguage(id); if (language) setSourceCode(starterCode(language)); }}>{compilerLanguages.map(language => <option key={language.id} value={language.id}>{language.name}</option>)}</select></label></div><label className="code-label" htmlFor="practice-code">Source code</label><textarea id="practice-code" className="code-editor" value={sourceCode} onChange={event => setSourceCode(event.target.value)} onKeyDown={handleCodeKeyDown} spellCheck={false} autoCapitalize="off" autoCorrect="off" aria-label="Source code editor"/><label className="code-label" htmlFor="practice-stdin">Standard input <span>Optional</span></label><textarea id="practice-stdin" className="stdin-editor" value={stdin} onChange={event => setStdin(event.target.value)} placeholder="Input passed to your program"/><div className="coding-actions"><small>Code is sent to Judge0 CE to compile and run</small><button className="primary-btn" onClick={runCode} disabled={compilerBusy}>{compilerBusy ? "Running…" : "Run code"}</button></div><div className="compiler-result"><div><b>Output</b><span>{compilerStatus}</span></div><pre>{compilerOutput}</pre><button className="link-btn" onClick={() => setAnswer(current => current ? `${current}\n\n${sourceCode}` : sourceCode)}>Add code to response</button></div></div>}<div className="chat-box">{messages.map((message, index) => <div className={`chat-message ${message.role === 'candidate' ? 'candidate' : ''}`} key={index}><div className="chat-face">{message.role === 'candidate' ? name[0] : 'AI'}</div><div className="bubble-wrap"><small>{message.role === 'candidate' ? name : 'Interviewer'}</small><div className="bubble">{message.text}</div></div></div>)}{working && <div className="chat-message"><div className="chat-face">AI</div><div className="bubble typing"><i /><i /><i /></div></div>}</div><form className="answer-form" onSubmit={submitAnswer}><textarea value={answer} onChange={event => setAnswer(event.target.value)} placeholder="Take your time. Type your answer here…" aria-label="Your answer" required /><button className="send-btn" aria-label="Send answer" disabled={working}>↑</button></form></div></section>}
       {page === 'results' && report && <section className="page active"><div className="page-heading"><div className="eyebrow">PRACTICE COMPLETE</div><h1>Progress looks good on you.</h1><p>{report.overall_feedback}</p></div><div className="result-hero"><div className="score-ring" style={{ ['--score' as string]: `${Number(report.overall_score ?? 0) * 10}%` }}><div className="score-center"><strong>{Number(report.overall_score ?? 0).toFixed(1)}</strong><small>OUT OF 10</small></div></div><div className="result-copy"><div className="eyebrow">{topic.toUpperCase()} <span className="eyebrow-separator">/</span> {mode.toUpperCase()}</div><h2>Your practice report</h2><p>One clear next step makes all the difference.</p><div className="insight-badges"><span>Knowledge {Number(report.knowledge_score ?? 0).toFixed(1)}</span>{report.problem_solving_score != null && <span>Problem solving {Number(report.problem_solving_score).toFixed(1)}</span>}</div></div></div><div className="feedback-grid"><div className="feedback-card"><h3><span className="feedback-marker good">+</span> What went well</h3><ul>{(report.strengths || []).map(item => <li key={item}>{item}</li>)}</ul></div><div className="feedback-card improve"><h3><span className="feedback-marker grow">↗</span> Room to grow</h3><ul>{(report.areas_to_improve || report.weaknesses || []).map(item => <li key={item}>{item}</li>)}</ul></div></div><div className="result-actions"><button className="primary-btn" onClick={() => navigate('setup')}>Practice again →</button><button className="secondary-btn" onClick={() => navigate('history')}>See progress</button></div></section>}
-      {page === 'history' && <section className="page active"><div className="page-heading"><div className="eyebrow">YOUR PRACTICE, OVER TIME</div><h1>Progress</h1><p>Every session adds to your confidence.</p></div><div className="stat-grid"><div className="stat-card"><div className="stat-top">Sessions completed</div><div className="stat-value">{sessions.length}</div></div><div className="stat-card"><div className="stat-top">Average score</div><div className="stat-value">{average}</div></div><div className="stat-card"><div className="stat-top">Practice topics</div><div className="stat-value">{new Set(sessions.map(item => item.topic)).size}</div></div></div><div className="section-head"><h2>Score trend</h2></div><div className="panel">{homeChart}</div><div className="section-head"><h2>Practice history</h2><button className="link-btn" onClick={() => navigate('setup')}>+ New practice</button></div><div className="filter-row">{['All', ...new Set(sessions.map(item => item.topic))].map(item => <button className={`filter-chip ${filter === item ? 'active' : ''}`} key={item} onClick={() => setFilter(item)}>{item}</button>)}</div><div className="history-list">{sessions.filter(item => filter === 'All' || item.topic === filter).map((item, index) => <div className="history-row" key={`${item.date}-${index}`}><span className="topic-icon"><Icon name={topics.find(t => t.name === item.topic)?.icon || 'book'} /></span><div className="history-info"><b>{item.topic} interview</b><small>{item.date} · {item.duration}</small></div><div className="history-result">{item.score.toFixed(1)}<small> / 10</small></div></div>)}</div></section>}
+      {page === 'history' && <section className="page active"><div className="page-heading"><div className="eyebrow">YOUR PRACTICE, OVER TIME</div><h1>Progress</h1><p>Every session adds to your confidence.</p></div><div className="stat-grid"><div className="stat-card"><div className="stat-top">Sessions completed</div><div className="stat-value">{sessions.length}</div></div><div className="stat-card"><div className="stat-top">Average score</div><div className="stat-value">{average}</div></div><div className="stat-card"><div className="stat-top">Practice topics</div><div className="stat-value">{new Set(sessions.map(item => item.topic)).size}</div></div></div><div className="section-head"><h2>Score trend</h2></div><div className="panel">{homeChart}</div><div className="panel activity-panel"><div className="activity-heading"><div><h3>Practice activity</h3><p>Your completed sessions across the year</p></div><strong>{streak} day streak</strong></div><ActivityHeatmap sessions={sessions} /></div><div className="section-head"><h2>Practice history</h2><button className="link-btn" onClick={() => navigate('setup')}>+ New practice</button></div><div className="filter-row">{['All', ...new Set(sessions.map(item => item.topic))].map(item => <button className={`filter-chip ${filter === item ? 'active' : ''}`} key={item} onClick={() => setFilter(item)}>{item}</button>)}</div><div className="history-list">{sessions.filter(item => filter === 'All' || item.topic === filter).map((item, index) => <div className="history-row" key={`${item.date}-${index}`}><span className="topic-icon"><Icon name={topics.find(t => t.name === item.topic)?.icon || 'book'} /></span><div className="history-info"><b>{item.topic} interview</b><small>{item.date} · {item.duration}</small></div><div className="history-result">{item.score.toFixed(1)}<small> / 10</small></div></div>)}</div></section>}
       {page === 'profile' && <section className="page active"><div className="page-heading"><div className="eyebrow">PREFERENCES</div><h1>Your practice defaults</h1><p>Keep the next session ready for you.</p></div><div className="panel settings-summary"><h3>Interview setup</h3><div className="setting-row"><div><b>Experience level</b><small>{level}</small></div><button className="secondary-btn small-btn" onClick={() => { setPage('setup'); setSetupStep(2); }}>Change</button></div><div className="setting-row"><div><b>Interview style</b><small>{mode}</small></div><button className="secondary-btn small-btn" onClick={() => { setPage('setup'); setSetupStep(3); }}>Change</button></div><div className="setting-row"><div><b>Question count</b><small>{limit} questions</small></div><button className="secondary-btn small-btn" onClick={() => { setPage('setup'); setSetupStep(3); }}>Change</button></div></div><div className="profile-note"><span className="note-symbol"><Icon name="book" size={18} /></span><div><b>A little practice adds up.</b><p>Your sessions and preferences stay saved on this device.</p></div></div></section>}
     </main>
     <nav className="bottom-nav" aria-label="Mobile navigation"><button className={page === 'home' ? 'active' : ''} onClick={() => navigate('home')}><span className="nav-icon"><Icon name="home" /></span>Home</button><button className={page === 'setup' ? 'active' : ''} onClick={() => navigate('setup')}><span className="nav-icon"><Icon name="play" /></span>Practice</button><button className={page === 'history' ? 'active' : ''} onClick={() => navigate('history')}><span className="nav-icon"><Icon name="chart" /></span>Progress</button><button className={page === 'profile' ? 'active' : ''} onClick={() => navigate('profile')}><span className="nav-icon"><Icon name="settings" /></span>Settings</button></nav>
