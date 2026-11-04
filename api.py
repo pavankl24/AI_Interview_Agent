@@ -1,9 +1,8 @@
 from pathlib import Path
 from typing import Literal
-from uuid import UUID
 import logging
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -11,7 +10,7 @@ from dotenv import load_dotenv
 
 from agent import InterviewAgent
 from report import InterviewReport
-from database import get_interviews, is_supabase_configured, save_interview
+from database import get_interviews, is_supabase_configured, save_interview, verify_access_token
 
 load_dotenv()
 
@@ -35,7 +34,6 @@ logger = logging.getLogger(__name__)
 
 
 class StartInterviewRequest(BaseModel):
-    client_id: UUID
     interview_type: str
     max_questions: int = Field(default=5, ge=1, le=50)
     difficulty: Literal["Beginner", "Intermediate", "Advanced"] = "Intermediate"
@@ -48,8 +46,19 @@ class AnswerRequest(BaseModel):
     answer: str
 
 
+def authenticated_user(authorization: str | None = Header(default=None)) -> str:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Sign in with Google to continue.")
+    user_id = verify_access_token(authorization[7:].strip())
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Your sign-in session is invalid or expired. Sign in again.")
+    return user_id
+
+
 @app.post("/interview/start")
-def start_interview(data: StartInterviewRequest):
+def start_interview(data: StartInterviewRequest, authorization: str | None = Header(default=None)):
+
+    user_id = authenticated_user(authorization)
 
     interview_type = data.interview_type.strip()
 
@@ -61,14 +70,14 @@ def start_interview(data: StartInterviewRequest):
     response, raw = agent.ask_question(True)
     agent.last_ai_response = raw
 
-    sessions["current"] = {
+    sessions[user_id] = {
         "agent": agent,
         "report": InterviewReport(interview_type),
         "question_count": 1,
         "max_questions": data.max_questions,
         "difficulty": data.difficulty,
         "interview_mode": data.interview_mode,
-        "client_id": str(data.client_id),
+        "client_id": user_id,
         "practical_questions": bool(response["is_practical"])
     }
 
@@ -81,12 +90,14 @@ def start_interview(data: StartInterviewRequest):
 
 
 @app.post("/interview/answer")
-def submit_answer(data: AnswerRequest):
+def submit_answer(data: AnswerRequest, authorization: str | None = Header(default=None)):
 
-    if "current" not in sessions:
+    user_id = authenticated_user(authorization)
+
+    if user_id not in sessions:
         raise HTTPException(status_code=404, detail="No active interview.")
 
-    session = sessions["current"]
+    session = sessions[user_id]
     agent = session["agent"]
 
     agent.add_answer(agent.last_ai_response, data.answer)
@@ -112,7 +123,7 @@ def submit_answer(data: AnswerRequest):
             logger.exception("Could not save completed interview report to Supabase")
             history_persisted = False
 
-        del sessions["current"]
+        del sessions[user_id]
 
         return {
             "evaluation": "Interview completed.",
@@ -140,12 +151,14 @@ def submit_answer(data: AnswerRequest):
 
 
 @app.post("/interview/finish")
-def finish_interview():
+def finish_interview(authorization: str | None = Header(default=None)):
 
-    if "current" not in sessions:
+    user_id = authenticated_user(authorization)
+
+    if user_id not in sessions:
         raise HTTPException(status_code=404, detail="No active interview.")
 
-    session = sessions["current"]
+    session = sessions[user_id]
 
     report = session["report"].generate_report(
         session["agent"].messages,
@@ -162,15 +175,16 @@ def finish_interview():
         "report": report,
     })
 
-    del sessions["current"]
+    del sessions[user_id]
 
     return report
 
 
 @app.get("/interview/history")
-def interview_history(client_id: UUID):
+def interview_history(authorization: str | None = Header(default=None)):
+    user_id = authenticated_user(authorization)
     try:
-        return {"configured": is_supabase_configured(), "sessions": get_interviews(str(client_id))}
+        return {"configured": is_supabase_configured(), "sessions": get_interviews(user_id)}
     except Exception as error:
         logger.exception("Could not load interview history from Supabase")
         raise HTTPException(status_code=503, detail="Could not load saved interview history.") from error

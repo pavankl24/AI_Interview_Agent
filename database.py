@@ -9,7 +9,7 @@ load_dotenv()
 
 
 def is_supabase_configured() -> bool:
-    return bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SECRET_KEY"))
+    return bool(os.getenv("SUPABASE_URL") and (os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")))
 
 
 @lru_cache(maxsize=1)
@@ -18,7 +18,20 @@ def _client():
         return None
     from supabase import create_client
 
-    return create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SECRET_KEY"])
+    key = os.getenv("SUPABASE_SECRET_KEY") or os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+    return create_client(os.environ["SUPABASE_URL"], key)
+
+
+def verify_access_token(access_token: str) -> str | None:
+    """Return the authenticated Supabase user ID only after Auth verifies the token."""
+    client = _client()
+    if client is None:
+        return None
+    try:
+        response = client.auth.get_user(access_token)
+        return str(response.user.id) if response.user else None
+    except Exception:
+        return None
 
 
 def save_interview(payload: dict) -> None:

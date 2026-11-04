@@ -10,6 +10,7 @@
     "preview": "node web/preview-server.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
