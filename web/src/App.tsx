@@ -100,7 +100,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#080d1a' : '#f4f1e8');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#202522' : '#f5f4ef');
     localStorage.setItem('cogniv.theme', theme);
   }, [theme]);
   useEffect(() => { localStorage.setItem('prepwise.sessions.v1', JSON.stringify(sessions)); }, [sessions]);
