@@ -135,6 +135,48 @@ p, .welcome-line p, .page-heading p, .panel p, .choice-card small,
 .chart-labels button:focus-visible, button:focus-visible, a:focus-visible,
 textarea:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
+/* New dashboard composition: score-first summaries and a readable session ledger */
+.nav-icon { display: grid; place-items: center; width: 20px; height: 20px; flex: none; }
+.nav-icon svg, .topic-icon svg, .stat-icon svg, .choice-icon svg,
+.mentor-icon svg, .theme-icon svg, .note-symbol svg { display: block; }
+.topic-icon { display: grid; place-items: center; flex: none; }
+.stat-icon { display: grid; place-items: center; border-radius: 8px; }
+.choice-icon { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface2); }
+.mentor-icon { display: grid; place-items: center; border-radius: 10px; }
+.theme-toggle { width: 38px; height: 38px; justify-content: center; padding: 0; }
+.theme-icon { display: grid; place-items: center; color: var(--muted); }
+.dashboard-page .welcome-line { align-items: center; margin-bottom: 20px; }
+.dashboard-page .welcome-line h1 { font-size: 28px; font-weight: 500; letter-spacing: -0.8px; }
+.dashboard-page .hero-card { min-height: 220px; }
+.dashboard-page .hero-copy h2 { max-width: 440px; font-size: 28px; font-weight: 500; letter-spacing: -0.7px; }
+.dashboard-page .hero-art { width: 300px; height: 160px; }
+.dashboard-page .path-visual { padding: 16px; }
+.dashboard-page .path-caption { font-size: 11px; }
+.dashboard-page .path-visual svg { inset: 24px 12px 12px; width: calc(100% - 24px); height: calc(100% - 36px); }
+.dashboard-page .path-label { right: 16px; bottom: 12px; }
+.dashboard-page .session-list { grid-template-columns: 1fr; gap: 8px; }
+.dashboard-page .session-card { display: grid; grid-template-columns: minmax(180px, 1fr) auto minmax(100px, 180px); align-items: center; gap: 20px; padding: 12px 16px; }
+.dashboard-page .session-title { margin: 0; }
+.dashboard-page .session-score strong { font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.dashboard-page .session-score span { font-size: 11px; }
+.dashboard-page .score-track { margin: 0; }
+.dashboard-page .stat-grid { margin-top: 12px; }
+.dashboard-page .stat-card { min-height: 112px; }
+.dashboard-page .stat-value { font-size: 27px; }
+.dashboard-page .section-head h2 { font-size: 17px; font-weight: 500; }
+.dashboard-page .two-col { grid-template-columns: minmax(0, 1.35fr) minmax(280px, .85fr); gap: 12px; }
+.dashboard-page .panel h3 { font-size: 15px; font-weight: 500; }
+.dashboard-page .area-chart { margin-top: 12px; }
+.dashboard-page .chart-labels button { font-variant-numeric: tabular-nums; }
+.dashboard-page .skill-row { margin: 18px 0; grid-template-columns: 112px 1fr 36px; }
+.dashboard-page .skill-row b { font-variant-numeric: tabular-nums; }
+.brand-mark { overflow: hidden; border-radius: 8px; }
+.brand-mark img { object-fit: contain; }
+.sidebar-foot { font-size: 11px; }
+.page-heading h1 { font-weight: 500; letter-spacing: -0.7px; }
+.history-row { min-height: 60px; }
+.history-result { font-variant-numeric: tabular-nums; font-weight: 500; }
+
 @media (max-width: 900px) { .main-area { padding-left: 268px; padding-right: 24px; } }
 @media (max-width: 650px) {
   .main-area { padding: 0 16px 88px; }
@@ -148,6 +190,16 @@ textarea:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
   .panel { padding: 16px; }
   .bottom-nav { backdrop-filter: none; }
   .chat-box { background: var(--surface); }
+  .dashboard-page .welcome-line h1 { font-size: 24px; }
+  .dashboard-page .hero-copy h2 { font-size: 20px; }
+  .dashboard-page .hero-art { width: 104px; height: 112px; }
+  .dashboard-page .session-card { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding: 12px; }
+  .dashboard-page .session-score { justify-self: end; }
+  .dashboard-page .session-score span { display: none; }
+  .dashboard-page .session-card .score-track { grid-column: 1 / -1; }
+  .dashboard-page .two-col { grid-template-columns: 1fr; }
+  .dashboard-page .skill-row { grid-template-columns: 104px 1fr 36px; }
+  .choice-icon { width: 36px; height: 36px; margin-bottom: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
