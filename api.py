@@ -265,19 +265,24 @@ def finish_interview(authorization: str | None = Header(default=None)):
         session["practical_questions"]
     )
 
-    save_interview({
-        "client_id": session["client_id"],
-        "topic": session["agent"].interview_type,
-        "difficulty": session["difficulty"],
-        "interview_mode": session["interview_mode"],
-        "max_questions": session["max_questions"],
-        "overall_score": report.get("overall_score", report.get("knowledge_score")),
-        "report": report,
-    })
+    try:
+        save_interview({
+            "client_id": session["client_id"],
+            "topic": session["agent"].interview_type,
+            "difficulty": session["difficulty"],
+            "interview_mode": session["interview_mode"],
+            "max_questions": session["max_questions"],
+            "overall_score": report.get("overall_score", report.get("knowledge_score")),
+            "report": report,
+        })
+        history_persisted = is_supabase_configured()
+    except Exception:
+        logger.exception("Could not save ended interview report to Supabase")
+        history_persisted = False
 
     del sessions[user_id]
 
-    return report
+    return {"report": report, "history_persisted": history_persisted}
 
 
 @app.get("/interview/history")
