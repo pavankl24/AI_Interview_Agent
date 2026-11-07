@@ -1,0 +1,18 @@
+@import "tailwindcss";
+@import "../styles.css" layer(base);
+@import "../theme.css" layer(base);
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+@custom-variant light (&:where([data-theme="light"], [data-theme="light"] *));
+
+@theme {
+  --color-ink: #111112;
+  --color-surface: #1b1b1d;
+  --color-wine-400: #bd6677;
+  --color-wine-500: #a34558;
+  --color-wine-600: #873246;
+  --color-wine-700: #672635;
+  --color-blue-300: #9db7e9;
+  --color-blue-400: #7799d7;
+  --color-paper: #f3f0eb;
+}
