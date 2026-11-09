@@ -1,5 +1,4 @@
 :root{--chart-fill:#4d83f7;--chart-line:#74a0ff;--switch-duration:260ms;color-scheme:dark;transition:background-color var(--switch-duration) ease,color var(--switch-duration) ease}
-:root[data-theme="light"]{--bg:#f3f6fc;--surface:#fff;--surface2:#e9eef7;--line:#dbe2ed;--text:#192438;--muted:#65748b;--blue:#3267d5;--blue2:#4f80e8;--chart-fill:#3677e8;--chart-line:#2864d4;color-scheme:light}
 body,.sidebar,.topbar,.hero-card,.panel,.stat-card,.session-card,.choice-card,.history-row,.interview-top,.chat-box,.chat-bubble,.metric-card,.feedback-card,.result-hero,.answer-form textarea,.segmented,.filter-chip,.theme-toggle,.bottom-nav{transition:background-color var(--switch-duration) ease,color var(--switch-duration) ease,border-color var(--switch-duration) ease,box-shadow var(--switch-duration) ease}
 body{background:var(--bg);color:var(--text)}
 .sidebar{background:var(--surface);border-color:var(--line)}.topbar{border-color:var(--line)}.side-label,.sidebar-foot{color:var(--muted)}.brand{color:var(--text)}.nav-link{color:var(--muted)}.nav-link:hover,.nav-link.active{background:color-mix(in srgb,var(--blue) 11%,var(--surface));color:var(--text)}
@@ -14,8 +13,3 @@ body{background:var(--bg);color:var(--text)}
 .activity-heatmap-wrap{max-width:100%;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
 .activity-cell{flex:none}
 @media(max-width:650px){.activity-panel{padding:14px 12px!important}.activity-heatmap-wrap{margin-inline:-2px}.profile-photo-row{display:grid!important;grid-template-columns:44px minmax(0,1fr);gap:10px!important;padding:13px!important}.profile-photo-preview{width:44px!important;height:44px!important;grid-row:span 2}.profile-photo-copy{min-width:0!important;font-size:13px}.profile-photo-copy small{font-size:11px;line-height:1.35}.upload-photo-button{grid-column:2;justify-self:start}.profile-photo-row>.link-btn{grid-column:2;justify-self:start}}
-:root[data-theme="light"] .activity-cell.level-0{background:#e3e8ef!important;border-color:#c6cfdb!important}
-:root[data-theme="light"] .activity-cell.level-1{background:#b8cff9!important;border-color:#8eafea!important}
-:root[data-theme="light"] .activity-cell.level-2{background:#719bea!important;border-color:#5a84d0!important}
-:root[data-theme="light"] .activity-cell.level-3{background:#315ee8!important;border-color:#315ee8!important}
-:root[data-theme="light"] .activity-months,:root[data-theme="light"] .activity-weekdays,:root[data-theme="light"] .activity-legend{color:#59677c!important}
