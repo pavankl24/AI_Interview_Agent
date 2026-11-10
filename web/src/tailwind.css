@@ -3,15 +3,6 @@
 @import "../theme.css" layer(base);
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
-@media (min-width: 901px) {
-  html body .main-area {
-    box-sizing: border-box !important;
-    width: calc(100% - 226px);
-    max-width: none;
-    margin: 0 0 0 226px;
-    padding: 0 32px 55px;
-  }
-}
 .activity-grid .activity-cell {
   display: block;
   width: 12px;
@@ -147,3 +138,59 @@ body, .app-shell, .main-area { background: var(--bg) !important; color: var(--te
 .button-spinner { display: inline-block; width: 15px; height: 15px; flex: none; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: button-spin .7s linear infinite; }
 @keyframes button-spin { to { transform: rotate(360deg); } }
 .heatmap-cursor-tip { position: fixed; z-index: 30; max-width: 220px; padding: 9px 11px; border: 1px solid #44464b; border-radius: 10px; background: #1b1b1d; color: #f3f0eb; font-size: 11px; line-height: 1.4; box-shadow: 0 10px 28px #0009; pointer-events: none; }
+
+/* Cogniv navigation: one compact workspace header across screen sizes. */
+.app-header { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 28px; min-height: 68px; padding: 0 32px; border-bottom: 1px solid #2a2b2e; background: #111112f2; backdrop-filter: blur(12px); }
+.app-brand { display: inline-flex; flex: 0 0 204px; align-items: center; gap: 10px; color: #f3f0eb; font: 600 17px Manrope, sans-serif; letter-spacing: -.2px; text-decoration: none; }
+.app-brand-mark { display: grid; width: 32px; height: 32px; place-items: center; flex: none; }
+.app-brand-mark img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.primary-nav { display: flex; flex: 1; align-items: center; gap: 4px; }
+.primary-nav-link { position: relative; display: inline-flex; min-height: 40px; align-items: center; gap: 9px; padding: 0 13px; border: 0; border-radius: 8px; background: transparent; color: #a1a1a6; font-size: 13px; font-weight: 500; transition: color 140ms ease, background-color 140ms ease; }
+.primary-nav-link:hover:not(:disabled) { background: #1b1c1e; color: #ededed; }
+.primary-nav-link.active { background: #232325; color: #f2f2f2; }
+.primary-nav-link.active::after { position: absolute; right: 12px; bottom: 0; left: 12px; height: 2px; border-radius: 2px; background: #83a5e8; content: ""; }
+.primary-nav-link:disabled { cursor: default; opacity: .55; }
+.user-controls { display: flex; align-items: center; gap: 12px; }
+.user-controls .streak { min-height: 36px; }
+.user-email { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.avatar-button { display: grid; width: 36px; height: 36px; overflow: hidden; place-items: center; padding: 0; border: 1px solid #38393d; border-radius: 50%; background: #232325; color: #ededed; font-weight: 600; }
+.avatar-button img { width: 100%; height: 100%; object-fit: cover; }
+.main-area { width: min(100%, 1440px); max-width: 1440px; margin: 0 auto; padding: 0 32px 56px; }
+.primary-nav-link:focus-visible, .menu-toggle:focus-visible, .app-brand:focus-visible { outline: 2px solid #9db7e9; outline-offset: 3px; }
+.choice-card { position: relative; min-height: 144px; padding: 20px; border-color: #303135 !important; border-radius: 14px; background: #1b1b1d !important; text-align: left; transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease; }
+.choice-card:hover { border-color: #64666c !important; background: #202123 !important; }
+.choice-card.selected { border: 2px solid #83a5e8 !important; background: #253b64 !important; color: #f3f0eb !important; box-shadow: inset 0 0 0 1px #ffffff24 !important; }
+.choice-card.selected b, .choice-card.selected small, .choice-card.selected .choice-icon, .choice-card.selected .level-number { color: #f3f0eb !important; }
+.choice-card.selected::after { position: absolute; top: 12px; right: 12px; display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; background: #9db7e9; color: #111112; content: "✓"; font-size: 13px; font-weight: 700; }
+.level-card { min-height: 144px; }
+.mode-card { min-height: 144px; }
+.setup-footer { margin-top: 24px; }
+.mobile-menu-footer, .menu-toggle { display: none; }
+@media (max-width: 1080px) {
+  .app-header { min-height: 64px; gap: 12px; padding: 0 20px; }
+  .app-brand { flex-basis: auto; min-width: 0; margin-right: auto; }
+  .primary-nav { position: absolute; top: calc(100% + 1px); right: 16px; left: 16px; display: none; flex-direction: column; align-items: stretch; gap: 4px; padding: 8px; border: 1px solid #303135; border-radius: 12px; background: #19191b; box-shadow: 0 12px 28px #0008; }
+  .primary-nav.open { display: flex; }
+  .primary-nav-link { min-height: 44px; }
+  .primary-nav-link.active::after { top: 10px; right: auto; bottom: 10px; left: 0; width: 2px; height: auto; }
+  .user-controls { gap: 8px; }
+  .user-controls .user-email, .user-controls > .signout-btn { display: none; }
+  .menu-toggle { display: grid; width: 40px; height: 40px; place-items: center; border: 1px solid #303135; border-radius: 9px; background: #1b1b1d; color: #ededed; }
+  .mobile-menu-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 8px 4px; border-top: 1px solid #303135; color: #a1a1a6; font-size: 12px; }
+  .mobile-menu-footer > span { max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .main-area { padding: 0 24px 48px; }
+}
+@media (max-width: 560px) {
+  .app-header { padding: 0 16px; }
+  .app-brand { gap: 8px; font-size: 15px; }
+  .app-brand-mark { width: 28px; height: 28px; }
+  .user-controls .streak { min-height: 32px; gap: 5px; padding: 6px 8px; font-size: 10px; }
+  .user-controls .streak span svg { width: 13px; height: 13px; }
+  .avatar-button { width: 32px; height: 32px; }
+  .main-area { padding: 0 16px 40px; }
+  .choice-card { min-height: 132px; padding: 16px; }
+  .level-card, .mode-card { min-height: 0; }
+  .choice-grid { gap: 8px; }
+  .mode-grid, .level-grid { gap: 8px; }
+  .setup-footer { align-items: center; }
+}
