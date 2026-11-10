@@ -194,3 +194,33 @@ body, .app-shell, .main-area { background: var(--bg) !important; color: var(--te
   .mode-grid, .level-grid { gap: 8px; }
   .setup-footer { align-items: center; }
 }
+
+/* Keep the coding interview editor in a deliberate vertical workbench. */
+.coding-workbench { display: grid; gap: 4px; min-width: 0; margin: 0 0 16px; padding: 20px; border: 1px solid #303033; border-radius: 14px; background: #19191b; color: #ededed; }
+.coding-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+.coding-heading h3 { margin: 0 0 4px; color: #ededed; font-size: 16px; font-weight: 500; }
+.coding-heading p { margin: 0; color: #a1a1a6; font-size: 13px; }
+.coding-heading label { display: grid; gap: 6px; color: #a1a1a6; font-size: 12px; }
+.coding-heading select { width: min(300px, 40vw); min-height: 40px; padding: 8px 32px 8px 10px; border: 1px solid #38393d; border-radius: 8px; background: #232325; color: #ededed; }
+.code-label { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 6px; color: #a1a1a6; font-size: 12px; }
+.code-label span { color: #a1a1a6; }
+.code-editor, .stdin-editor { display: block; width: 100%; min-width: 0; resize: vertical; padding: 14px 16px; border: 1px solid #303033; border-radius: 9px; background: #141415; color: #ededed; font: 13px/1.6 Consolas, 'SFMono-Regular', monospace; tab-size: 2; white-space: pre; overflow: auto; }
+.code-editor { min-height: 260px; }
+.stdin-editor { min-height: 72px; white-space: pre-wrap; }
+.code-editor:focus, .stdin-editor:focus { border-color: #83a5e8; outline: 2px solid #83a5e833; outline-offset: 1px; }
+.coding-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; }
+.coding-actions small { color: #a1a1a6; font-size: 12px; }
+.compiler-result { min-width: 0; margin-top: 12px; padding: 12px 14px; border: 1px solid #303033; border-radius: 9px; background: #232325; }
+.compiler-result > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #ededed; font-size: 12px; }
+.compiler-result > div span { color: #a1a1a6; }
+.compiler-result pre { min-height: 48px; max-height: 220px; overflow: auto; margin: 10px 0; color: #ededed; font: 12px/1.6 Consolas, 'SFMono-Regular', monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.compiler-result .link-btn { padding: 0; font-size: 12px; }
+.compiler-buttons { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+@media (max-width: 650px) {
+  .coding-workbench { padding: 16px; }
+  .coding-heading { align-items: stretch; flex-direction: column; gap: 12px; }
+  .coding-heading select { width: 100%; max-width: none; }
+  .code-editor { min-height: 220px; }
+  .coding-actions, .compiler-buttons { align-items: stretch; flex-direction: column; }
+  .coding-actions .primary-btn, .compiler-buttons button { width: 100%; }
+}
