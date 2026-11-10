@@ -137,3 +137,13 @@ body, .app-shell, .main-area { background: var(--bg) !important; color: var(--te
   --color-blue-400: #7799d7;
   --color-paper: #f3f0eb;
 }
+
+/* Setup selection, heatmap tooltip, and start loading feedback. */
+.level-card { position: relative; min-height: 142px; text-align: left; }
+.level-card.selected { background: #253b64 !important; border: 2px solid #9db7e9 !important; color: #f3f0eb !important; box-shadow: inset 0 0 0 1px #ffffff40, 0 0 0 2px #9db7e933 !important; }
+.level-card.selected .level-number, .level-card.selected b, .level-card.selected small { color: #f3f0eb !important; }
+.level-card:focus-visible { outline: 3px solid #9db7e9; outline-offset: 3px; }
+.start-interview-btn { min-width: 190px; }
+.button-spinner { display: inline-block; width: 15px; height: 15px; flex: none; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: button-spin .7s linear infinite; }
+@keyframes button-spin { to { transform: rotate(360deg); } }
+.heatmap-cursor-tip { position: fixed; z-index: 30; max-width: 220px; padding: 9px 11px; border: 1px solid #44464b; border-radius: 10px; background: #1b1b1d; color: #f3f0eb; font-size: 11px; line-height: 1.4; box-shadow: 0 10px 28px #0009; pointer-events: none; }
