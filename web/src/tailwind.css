@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "../styles.css" layer(base);
 @import "../theme.css" layer(base);
+@import "../animations.css";
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 .activity-grid .activity-cell {
@@ -49,7 +50,7 @@ body, .app-shell, .main-area { background: var(--bg) !important; color: var(--te
 .activity-grid .activity-cell:hover { outline: 2px solid #d9e5ff; outline-offset: 1px; z-index: 3; }
 .activity-cell[title] { cursor: help; }
 .activity-heatmap-wrap { scrollbar-color: #44464b transparent; }
-.page { animation: none !important; }
+/* page-enter animation is now handled by animations.css */
 .page h1, .page h2, .page h3 { color: var(--text); letter-spacing: 0; }
 .page h1 { font-size: 32px; font-weight: 500; }
 .eyebrow, .side-label { text-transform: none; letter-spacing: .02em; font-weight: 500; }

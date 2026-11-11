@@ -10,6 +10,9 @@ export default defineConfig({
   server: {
     host: '127.0.0.1',
     port: 5173,
-    proxy: { '/interview': 'http://127.0.0.1:8000' },
+    proxy: {
+      '/interview': 'http://127.0.0.1:8000',
+      '/compiler': 'http://127.0.0.1:8000',
+    },
   },
 });
