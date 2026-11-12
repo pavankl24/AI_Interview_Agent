@@ -11,8 +11,36 @@ class InterviewAgent:
         self.interview_mode = interview_mode
         mode_instructions = {
             "Technical conversation": "Ask conceptual and explanatory technical questions only. Do not ask the candidate to write code, produce a query, or solve an implementation exercise. Mark every question is_practical=false.",
-            "Coding & problem solving": "Every question must be a hands-on coding, query-writing, implementation, or algorithm problem relevant to the selected interview topic. Ask the candidate to explain their approach. Mark every question is_practical=true.",
-            "Balanced": "Mix technical discussion with practical coding, query-writing, or problem-solving questions relevant to the topic. Include a practical question within the first two questions and alternate formats where possible. Mark is_practical accurately for each question."
+            "Coding & problem solving": (
+                "Every question must be a hands-on coding, query-writing, implementation, or algorithm problem "
+                "relevant to the selected interview topic. Mark every question is_practical=true. "
+                "IMPORTANT — when is_practical=true, format the next_question field as a well-structured coding "
+                "problem using this exact template:\n\n"
+                "**Problem: <Short Title>**\n\n"
+                "<Clear 2-4 sentence description of what the candidate must implement or solve.>\n\n"
+                "**Example:**\n"
+                "Input: <sample input>\n"
+                "Output: <expected output>\n\n"
+                "**Constraints:**\n"
+                "- <constraint 1>\n"
+                "- <constraint 2>\n\n"
+                "Write your solution in the code editor below and explain your approach."
+            ),
+            "Balanced": (
+                "Mix technical discussion with practical coding, query-writing, or problem-solving questions "
+                "relevant to the topic. Include a practical question within the first two questions and alternate "
+                "formats where possible. Mark is_practical accurately for each question. "
+                "When is_practical=true, format the next_question field as a well-structured coding problem:\n\n"
+                "**Problem: <Short Title>**\n\n"
+                "<Clear 2-4 sentence description of what the candidate must implement or solve.>\n\n"
+                "**Example:**\n"
+                "Input: <sample input>\n"
+                "Output: <expected output>\n\n"
+                "**Constraints:**\n"
+                "- <constraint 1>\n"
+                "- <constraint 2>\n\n"
+                "Write your solution in the code editor below and explain your approach."
+            ),
         }
         self.mode_instruction = mode_instructions[interview_mode]
         self.last_ai_response = ""
@@ -56,10 +84,11 @@ The candidate's requested interview format is:
 
 Return your response as valid JSON.
 
-The JSON must contain exactly two keys:
-"evaluation","next_question" and is_practical.
+The JSON must contain exactly three keys:
+"evaluation", "next_question", and "is_practical".
 "is_practical" must be true if the question requires writing code, solving a programming problem, implementing something, or designing an algorithm.
 "is_practical" must be false for conceptual or theory questions.
+When "is_practical" is true, "next_question" must follow the structured coding problem template described in the format instructions above.
 """
             },
             {
@@ -72,6 +101,12 @@ The JSON must contain exactly two keys:
 
     def ask_question(self, first_question=False):
 
+        is_coding_mode = self.interview_mode in ("Coding & problem solving", "Balanced")
+        coding_reminder = (
+            "\nRemember: if is_practical=true, the next_question MUST follow the structured "
+            "coding problem template (Problem title, description, Example with Input/Output, Constraints)."
+        ) if is_coding_mode else ""
+
         if first_question:
             question_instruction = f"""
 Ask the first {self.interview_type} interview question.
@@ -79,22 +114,22 @@ Ask the first {self.interview_type} interview question.
 There is no candidate answer yet.
 
 Do not evaluate anything.
-Return an empty evaluation.
+Return an empty string for evaluation.
 
 Previously asked questions: {self.asked_questions}
 
 Ask exactly one question.
-Do not repeat previous questions.
+Do not repeat previous questions.{coding_reminder}
 """
         else:
             question_instruction = f"""
-Evaluate the candidate's previous answer briefly.
+Evaluate the candidate's previous answer briefly (1-3 sentences).
 
 Then ask exactly one new {self.interview_type} interview question.
 
 Previously asked questions: {self.asked_questions}
 
-Do not repeat previous questions.
+Do not repeat previous questions.{coding_reminder}
 """
 
         response = self.client.chat.completions.create(
