@@ -53,3 +53,37 @@ def get_interviews(client_id: str) -> list[dict]:
         .execute()
     )
     return response.data or []
+
+
+def get_leaderboard(limit: int = 20) -> list[dict]:
+    """Return top scores (best score per user per topic) for the leaderboard."""
+    client = _client()
+    if client is None:
+        return []
+    response = (
+        client.table("interview_sessions")
+        .select("client_id,topic,overall_score,created_at")
+        .order("overall_score", desc=True)
+        .limit(200)
+        .execute()
+    )
+    rows = response.data or []
+    # Keep only the best score per (client_id, topic)
+    seen: dict[tuple, dict] = {}
+    for row in rows:
+        key = (row["client_id"], row["topic"])
+        if key not in seen:
+            seen[key] = row
+    # Sort by score descending and take top `limit`
+    top = sorted(seen.values(), key=lambda r: float(r.get("overall_score") or 0), reverse=True)[:limit]
+    result = []
+    for rank, row in enumerate(top, 1):
+        uid = str(row["client_id"])
+        result.append({
+            "rank": rank,
+            "user_tag": f"User #{uid[:4].upper()}",
+            "topic": row["topic"],
+            "score": float(row.get("overall_score") or 0),
+            "date": row.get("created_at", "")[:10],
+        })
+    return result

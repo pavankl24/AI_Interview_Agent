@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 
 from agent import InterviewAgent
 from report import InterviewReport
-from database import get_interviews, is_supabase_configured, save_interview, verify_access_token
+from database import get_interviews, is_supabase_configured, save_interview, verify_access_token, get_leaderboard
 
 load_dotenv()
 
@@ -293,6 +293,16 @@ def interview_history(authorization: str | None = Header(default=None)):
     except Exception as error:
         logger.exception("Could not load interview history from Supabase")
         raise HTTPException(status_code=503, detail="Could not load saved interview history.") from error
+
+
+@app.get("/leaderboard")
+def leaderboard(authorization: str | None = Header(default=None)):
+    authenticated_user(authorization)
+    try:
+        return get_leaderboard(20)
+    except Exception as error:
+        logger.exception("Could not load leaderboard from Supabase")
+        raise HTTPException(status_code=503, detail="Could not load leaderboard.") from error
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="web")
