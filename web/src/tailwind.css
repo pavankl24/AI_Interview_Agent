@@ -152,8 +152,16 @@ body, .app-shell, .main-area { background: var(--bg) !important; color: var(--te
 .primary-nav-link.active::after { position: absolute; right: 12px; bottom: 0; left: 12px; height: 2px; border-radius: 2px; background: #83a5e8; content: ""; }
 .primary-nav-link:disabled { cursor: default; opacity: .55; }
 .user-controls { display: flex; align-items: center; gap: 12px; }
-.user-controls .streak { min-height: 36px; }
+.user-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f3f0eb; font-size: 14px; font-weight: 600; }
 .user-email { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-row { display: flex; align-items: center; gap: 12px; }
+.rank-cell { display: flex; width: 72px; flex: none; align-items: center; justify-content: center; }
+.rank-plain { color: #a1a1a6; font-size: 13px; font-weight: 700; }
+.medal-tag { display: inline-flex; min-width: 62px; justify-content: center; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.medal-gold { background: #3d3414; color: #f6d56a; }
+.medal-silver { background: #2d3036; color: #d5d7dc; }
+.medal-bronze { background: #3a2a1c; color: #e0a36a; }
+.history-row.is-you { border-color: #83a5e8 !important; background: #1c2740 !important; }
 .avatar-button { display: grid; width: 36px; height: 36px; overflow: hidden; place-items: center; padding: 0; border: 1px solid #38393d; border-radius: 50%; background: #232325; color: #ededed; font-weight: 600; }
 .avatar-button img { width: 100%; height: 100%; object-fit: cover; }
 .main-area { width: min(100%, 1440px); max-width: 1440px; margin: 0 auto; padding: 0 32px 56px; }
@@ -175,7 +183,7 @@ body, .app-shell, .main-area { background: var(--bg) !important; color: var(--te
   .primary-nav-link { min-height: 44px; }
   .primary-nav-link.active::after { top: 10px; right: auto; bottom: 10px; left: 0; width: 2px; height: auto; }
   .user-controls { gap: 8px; }
-  .user-controls .user-email, .user-controls > .signout-btn { display: none; }
+  .user-controls > .signout-btn { display: none; }
   .menu-toggle { display: grid; width: 40px; height: 40px; place-items: center; border: 1px solid #303135; border-radius: 9px; background: #1b1b1d; color: #ededed; }
   .mobile-menu-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 8px 4px; border-top: 1px solid #303135; color: #a1a1a6; font-size: 12px; }
   .mobile-menu-footer > span { max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -185,8 +193,7 @@ body, .app-shell, .main-area { background: var(--bg) !important; color: var(--te
   .app-header { padding: 0 16px; }
   .app-brand { gap: 8px; font-size: 15px; }
   .app-brand-mark { width: 28px; height: 28px; }
-  .user-controls .streak { min-height: 32px; gap: 5px; padding: 6px 8px; font-size: 10px; }
-  .user-controls .streak span svg { width: 13px; height: 13px; }
+  .user-controls .user-name { max-width: 96px; font-size: 13px; }
   .avatar-button { width: 32px; height: 32px; }
   .main-area { padding: 0 16px 40px; }
   .choice-card { min-height: 132px; padding: 16px; }

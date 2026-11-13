@@ -6,7 +6,7 @@ import os
 
 import httpx
 
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -44,6 +44,7 @@ class StartInterviewRequest(BaseModel):
     interview_mode: Literal[
         "Balanced", "Technical conversation", "Coding & problem solving"
     ] = "Balanced"
+    candidate_name: str = Field(default="", max_length=80)
 
 
 class AnswerRequest(BaseModel):
@@ -178,6 +179,7 @@ def start_interview(data: StartInterviewRequest, authorization: str | None = Hea
         "difficulty": data.difficulty,
         "interview_mode": data.interview_mode,
         "client_id": user_id,
+        "candidate_name": data.candidate_name.strip(),
         "practical_questions": bool(response["is_practical"])
     }
 
@@ -209,15 +211,7 @@ def submit_answer(data: AnswerRequest, authorization: str | None = Header(defaul
         )
 
         try:
-            save_interview({
-                "client_id": session["client_id"],
-                "topic": session["agent"].interview_type,
-                "difficulty": session["difficulty"],
-                "interview_mode": session["interview_mode"],
-                "max_questions": session["max_questions"],
-                "overall_score": report.get("overall_score", report.get("knowledge_score")),
-                "report": report,
-            })
+            save_interview(_interview_record(session, report))
             history_persisted = is_supabase_configured()
         except Exception:
             logger.exception("Could not save completed interview report to Supabase")
@@ -266,15 +260,7 @@ def finish_interview(authorization: str | None = Header(default=None)):
     )
 
     try:
-        save_interview({
-            "client_id": session["client_id"],
-            "topic": session["agent"].interview_type,
-            "difficulty": session["difficulty"],
-            "interview_mode": session["interview_mode"],
-            "max_questions": session["max_questions"],
-            "overall_score": report.get("overall_score", report.get("knowledge_score")),
-            "report": report,
-        })
+        save_interview(_interview_record(session, report))
         history_persisted = is_supabase_configured()
     except Exception:
         logger.exception("Could not save ended interview report to Supabase")
@@ -295,11 +281,28 @@ def interview_history(authorization: str | None = Header(default=None)):
         raise HTTPException(status_code=503, detail="Could not load saved interview history.") from error
 
 
+def _interview_record(session: dict, report: dict) -> dict:
+    stored = dict(report)
+    candidate_name = str(session.get("candidate_name") or "").strip()
+    if candidate_name:
+        stored["candidate_name"] = candidate_name
+    score = stored.get("overall_score", stored.get("knowledge_score"))
+    return {
+        "client_id": session["client_id"],
+        "topic": session["agent"].interview_type,
+        "difficulty": session["difficulty"],
+        "interview_mode": session["interview_mode"],
+        "max_questions": session["max_questions"],
+        "overall_score": score,
+        "report": stored,
+    }
+
+
 @app.get("/leaderboard")
-def leaderboard(authorization: str | None = Header(default=None)):
-    authenticated_user(authorization)
+def leaderboard(topic: str | None = Query(default=None), authorization: str | None = Header(default=None)):
+    user_id = authenticated_user(authorization)
     try:
-        return get_leaderboard(20)
+        return get_leaderboard(topic=topic, viewer_id=user_id)
     except Exception as error:
         logger.exception("Could not load leaderboard from Supabase")
         raise HTTPException(status_code=503, detail="Could not load leaderboard.") from error
