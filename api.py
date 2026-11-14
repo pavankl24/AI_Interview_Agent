@@ -3,6 +3,7 @@ from typing import Literal
 import logging
 import asyncio
 import os
+import uuid
 
 import httpx
 
@@ -49,6 +50,10 @@ class StartInterviewRequest(BaseModel):
 
 class AnswerRequest(BaseModel):
     answer: str
+
+
+class ResumeInterviewRequest(BaseModel):
+    session_id: str
 
 
 class CompilerRequest(BaseModel):
@@ -171,7 +176,9 @@ def start_interview(data: StartInterviewRequest, authorization: str | None = Hea
     response, raw = agent.ask_question(True)
     agent.last_ai_response = raw
 
+    session_id = str(uuid.uuid4())
     sessions[user_id] = {
+        "session_id": session_id,
         "agent": agent,
         "report": InterviewReport(interview_type),
         "question_count": 1,
@@ -180,14 +187,37 @@ def start_interview(data: StartInterviewRequest, authorization: str | None = Hea
         "interview_mode": data.interview_mode,
         "client_id": user_id,
         "candidate_name": data.candidate_name.strip(),
-        "practical_questions": bool(response["is_practical"])
+        "practical_questions": bool(response["is_practical"]),
+        "current_question": response["next_question"],
+        "chat_history": [{"role": "coach", "text": response["next_question"]}],
     }
 
     return {
         "question_number": 1,
         "max_questions": data.max_questions,
         "question": response["next_question"],
+        "session_id": session_id,
         "interview_completed": False
+    }
+
+
+@app.post("/interview/resume")
+def resume_interview(data: ResumeInterviewRequest, authorization: str | None = Header(default=None)):
+    user_id = authenticated_user(authorization)
+    session = sessions.get(user_id)
+    if not session or session.get("session_id") != data.session_id:
+        raise HTTPException(status_code=404, detail="No active interview was found. Start a new interview to continue.")
+
+    return {
+        "session_id": session["session_id"],
+        "topic": session["agent"].interview_type,
+        "difficulty": session["difficulty"],
+        "interview_mode": session["interview_mode"],
+        "question_number": session["question_count"],
+        "max_questions": session["max_questions"],
+        "question": session["current_question"],
+        "messages": session["chat_history"],
+        "interview_completed": False,
     }
 
 
@@ -203,6 +233,7 @@ def submit_answer(data: AnswerRequest, authorization: str | None = Header(defaul
     agent = session["agent"]
 
     agent.add_answer(agent.last_ai_response, data.answer)
+    session["chat_history"].append({"role": "candidate", "text": data.answer})
     if session["question_count"] >= session["max_questions"]:
 
         report = session["report"].generate_report(
@@ -234,6 +265,9 @@ def submit_answer(data: AnswerRequest, authorization: str | None = Header(defaul
 
     if response["is_practical"]:
         session["practical_questions"] = True
+
+    session["current_question"] = response["next_question"]
+    session["chat_history"].append({"role": "coach", "text": response["next_question"]})
 
     return {
         "evaluation": response["evaluation"],

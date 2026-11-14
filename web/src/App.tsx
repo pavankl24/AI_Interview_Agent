@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, type FormEvent } from 'react';
+import React, { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import logo from '../cogniv-mark.png';
 import { supabase } from './supabase';
 
@@ -302,6 +302,7 @@ export default function App() {
   const [compilerBusy, setCompilerBusy] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<string>('');
   const [profilePhotoOwner, setProfilePhotoOwner] = useState('');
+  const resumeAttemptedFor = useRef('');
   const name = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Alex';
   const accountPhoto = user && profilePhotoOwner === user.id ? profilePhoto : '';
   const avatarSource = accountPhoto || user?.user_metadata?.avatar_url || user?.user_metadata?.picture || '';
@@ -349,6 +350,34 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => { setUser(session?.user || null); setAuthReady(true); });
     return () => { alive = false; subscription.unsubscribe(); };
   }, []);
+  useEffect(() => {
+    if (!authReady || !user || !supabase || resumeAttemptedFor.current === user.id) return;
+    resumeAttemptedFor.current = user.id;
+    const storageKey = `cogniv.active.interview.v1.${user.id}`;
+    const sessionId = localStorage.getItem(storageKey);
+    if (!sessionId) return;
+    void (async () => {
+      try {
+        const result = await request('/interview/resume', { session_id: sessionId });
+        setTopic(result.topic);
+        setLevel(result.difficulty);
+        setMode(result.interview_mode);
+        setQuestionNo(result.question_number);
+        setLimit(result.max_questions);
+        setMessages(result.messages || [{ role: 'coach', text: result.question }]);
+        routeTo('interview');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Could not resume the interview.';
+        if (message.includes('(404)')) {
+          localStorage.removeItem(storageKey);
+          setNotice('That interview is no longer active. Start a new practice session.');
+          routeTo('home');
+        } else {
+          setNotice(message);
+        }
+      }
+    })();
+  }, [authReady, user]);
   useEffect(() => {
     if (!user || !supabase) { setSessions([]); return; }
     const authClient = supabase;
@@ -490,6 +519,7 @@ export default function App() {
     setWorking(true);
     try {
       const result = await request('/interview/start', { interview_type: topic, max_questions: limit, difficulty: level, interview_mode: mode, candidate_name: name });
+      if (user) localStorage.setItem(`cogniv.active.interview.v1.${user.id}`, result.session_id);
       setQuestionNo(result.question_number || 1); setMessages([{ role: 'coach', text: result.question }]); routeTo('interview');
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Could not reach the interview service.'); }
     finally { setWorking(false); }
@@ -500,6 +530,7 @@ export default function App() {
     try {
       const result = await request('/interview/answer', { answer: submitted });
       if (result.interview_completed) {
+        if (user) localStorage.removeItem(`cogniv.active.interview.v1.${user.id}`);
         const finalReport = result.report as Report; setReport(finalReport); setAssessedAt(new Date());
         setSessions(current => [{ topic: finalReport.interview_type || topic, score: Number(finalReport.overall_score ?? finalReport.knowledge_score ?? 0), date: new Intl.DateTimeFormat(undefined, { month: 'short', day: '2-digit' }).format(new Date()), activityDate: dateKey(new Date()), duration: 'Practice', report: finalReport }, ...current]);
         if (result.history_persisted === false) setNotice('Your report is ready, but Supabase could not save it. Check SUPABASE_URL in .env.');
@@ -515,6 +546,7 @@ export default function App() {
     setWorking(true);
     try {
       const result = await request('/interview/finish');
+      if (user) localStorage.removeItem(`cogniv.active.interview.v1.${user.id}`);
       const finalReport = (result.report || result) as Report;
       setReport(finalReport); setAssessedAt(new Date());
       setSessions(current => [{ topic: finalReport.interview_type || topic, score: Number(finalReport.overall_score ?? finalReport.knowledge_score ?? 0), date: new Intl.DateTimeFormat(undefined, { month: 'short', day: '2-digit' }).format(new Date()), activityDate: dateKey(new Date()), duration: 'Practice', report: finalReport }, ...current]);
