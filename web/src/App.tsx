@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import logo from '../cogniv-mark.png';
 import { supabase } from './supabase';
+import { requestApi } from './apiClient';
 import { useCopyToClipboard } from './hooks/useCopyToClipboard';
 import { useCountdown } from './hooks/useCountdown';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
@@ -462,13 +463,7 @@ export default function App() {
   };
   const request = async (path: string, body?: unknown) => {
     const { data: sessionData } = await supabase!.auth.getSession();
-    const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionData.session?.access_token || ''}` }, body: body ? JSON.stringify(body) : undefined });
-    const responseText = await response.text();
-    let responseData: any;
-    try { responseData = JSON.parse(responseText); }
-    catch { throw new Error(response.ok ? 'The interview service returned an unreadable response.' : `Interview service error (${response.status}). Check the FastAPI terminal for details.`); }
-    if (!response.ok) throw new Error(responseData.detail || `Interview service error (${response.status}).`);
-    return responseData;
+    return requestApi(path, body, sessionData.session?.access_token || '');
   };
   const runCode = async () => {
     if (compilerBusy || !sourceCode.trim()) return;
