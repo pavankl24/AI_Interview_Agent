@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 from agent import InterviewAgent
 from report import InterviewReport
 from database import get_interviews, is_supabase_configured, save_interview, verify_access_token, get_leaderboard
+from backend.services.difficulty_service import record_score
 
 load_dotenv()
 
@@ -184,6 +185,7 @@ def start_interview(data: StartInterviewRequest, authorization: str | None = Hea
         "question_count": 1,
         "max_questions": data.max_questions,
         "difficulty": data.difficulty,
+        "difficulty_streak": 0,
         "interview_mode": data.interview_mode,
         "client_id": user_id,
         "candidate_name": data.candidate_name.strip(),
@@ -212,6 +214,7 @@ def resume_interview(data: ResumeInterviewRequest, authorization: str | None = H
         "session_id": session["session_id"],
         "topic": session["agent"].interview_type,
         "difficulty": session["difficulty"],
+        "difficulty_streak": session.get("difficulty_streak", 0),
         "interview_mode": session["interview_mode"],
         "question_number": session["question_count"],
         "max_questions": session["max_questions"],
@@ -235,6 +238,14 @@ def submit_answer(data: AnswerRequest, authorization: str | None = Header(defaul
     agent.add_answer(agent.last_ai_response, data.answer)
     session["chat_history"].append({"role": "candidate", "text": data.answer})
     if session["question_count"] >= session["max_questions"]:
+        score = agent.score_answer(session["current_question"], data.answer)
+        difficulty, streak, promoted = record_score(
+            session["difficulty"], session.get("difficulty_streak", 0), score
+        )
+        session["difficulty"] = difficulty
+        session["difficulty_streak"] = streak
+        if promoted:
+            agent.set_difficulty(difficulty)
 
         report = session["report"].generate_report(
             agent.messages,
@@ -255,11 +266,27 @@ def submit_answer(data: AnswerRequest, authorization: str | None = Header(defaul
             "interview_completed": True,
             "report": report,
             "history_persisted": history_persisted,
+            "score": score,
+            "difficulty": difficulty,
+            "difficulty_streak": streak,
+            "difficulty_promoted": promoted,
         }
 
 
     response, raw = agent.ask_question(False)
     agent.last_ai_response = raw
+    score = response["score"]
+    difficulty, streak, promoted = record_score(
+        session["difficulty"], session.get("difficulty_streak", 0), score
+    )
+    session["difficulty"] = difficulty
+    session["difficulty_streak"] = streak
+    if promoted:
+        agent.set_difficulty(difficulty)
+        promoted_question, raw = agent.ask_question(question_only=True)
+        response["next_question"] = promoted_question["next_question"]
+        response["is_practical"] = promoted_question["is_practical"]
+        agent.last_ai_response = raw
 
     session["question_count"] += 1
 
@@ -274,6 +301,10 @@ def submit_answer(data: AnswerRequest, authorization: str | None = Header(defaul
         "question_number": session["question_count"],
         "max_questions": session["max_questions"],
         "question": response["next_question"],
+        "score": score,
+        "difficulty": difficulty,
+        "difficulty_streak": streak,
+        "difficulty_promoted": promoted,
         "interview_completed": False
     }
 

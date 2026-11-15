@@ -3,7 +3,6 @@
 @import "../theme.css" layer(base);
 @import "../animations.css";
 
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 .activity-grid .activity-cell {
   display: block;
   width: 12px;
