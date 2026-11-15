@@ -229,6 +229,15 @@ AI_Interview_Agent/
 │       ├── 001_interview_sessions.sql
 │       └── 002_auth_user_history.sql
 │
+├── backend/
+│   ├── main.py
+│   ├── routers/
+│   ├── services/
+│   ├── schemas.py
+│   ├── config.py
+│   ├── requirements.txt
+│   └── .env.example
+│
 ├── agent.py
 ├── api.py
 ├── database.py
@@ -306,21 +315,23 @@ source venv/bin/activate
 ### 4. Install Backend Dependencies
 
 ```bash
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 ```
 
 ### 5. Configure Environment Variables
 
-Create a `.env` file in the project root using the provided example:
+Create a root `.env` for frontend settings and a `backend/.env` for server credentials:
 
 ```bash
 cp .env.example .env
+cp backend/.env.example backend/.env
 ```
 
 On Windows PowerShell:
 
 ```powershell
 Copy-Item .env.example .env
+Copy-Item backend/.env.example backend/.env
 ```
 
 Add your API credentials and configuration.
@@ -352,14 +363,14 @@ npm run build
 ### 8. Start the FastAPI Backend
 
 ```bash
-uvicorn api:app --reload
+uvicorn backend.main:app --reload
 ```
 
 Open the application:
 
 **http://127.0.0.1:8000**
 
-The FastAPI backend serves the built frontend and handles live interview API requests.
+The FastAPI backend serves the built frontend and handles live interview requests. It also exposes `/api/question`, `/api/evaluate`, and `/health`. Store provider credentials in `backend/.env`.
 
 ### Frontend Development Mode
 
@@ -381,29 +392,17 @@ Keep the FastAPI backend running as well.
 
 The project uses environment variables to manage external service credentials.
 
-Example `.env` configuration:
+Root `.env` contains frontend configuration:
 
 ```env
-# Groq API
-GROQ_API_KEY=your_groq_api_key
-
-# Judge0 Configuration
-JUDGE0_API_URL=https://ce.judge0.com
-JUDGE0_API_KEY=
-
-# Supabase Backend Configuration
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SECRET_KEY=your_supabase_secret_key
-
-# Supabase Frontend Configuration
 VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_browser_key
 ```
 
 ### API Key Setup
 
-- **Groq:** Obtain your API key from [Groq Console](https://console.groq.com/).
-- **Supabase:** Obtain project credentials from [Supabase Dashboard](https://supabase.com/dashboard).
+- **Groq:** Obtain your API key from [Groq Console](https://console.groq.com/) and store it in `backend/.env`.
+- **Supabase:** Obtain project credentials from [Supabase Dashboard](https://supabase.com/dashboard). Keep server credentials in `backend/.env` and browser publishable settings in the root `.env`.
 - **Judge0:** Use the public CE endpoint or configure your own Judge0 instance.
 
 Never commit your actual `.env` file or expose private API credentials.
@@ -474,6 +473,9 @@ The FastAPI backend exposes the following primary endpoints:
 | Method | Endpoint | Description |
 |---|---|---|
 | GET | `/` | Serves the frontend application. |
+| GET | `/health` | Reports backend health. |
+| POST | `/api/question` | Generates an interview question. |
+| POST | `/api/evaluate` | Evaluates an answer and returns a score and next question. |
 | GET | `/compiler/languages` | Retrieves available programming languages. |
 | POST | `/compiler/execute` | Executes submitted code. |
 | POST | `/interview/start` | Starts a new interview session. |
