@@ -100,6 +100,30 @@ When "is_practical" is true, "next_question" must follow the structured coding p
 
         self.asked_questions = []
 
+    def set_difficulty(self, difficulty):
+        previous = self.difficulty
+        self.difficulty = difficulty
+        self.messages[0]["content"] = (
+            self.messages[0]["content"]
+            .replace(f"at {previous} difficulty", f"at {difficulty} difficulty")
+            .replace(f"selected {previous} level", f"selected {difficulty} level")
+            .replace(f"The difficulty is:\n{previous}", f"The difficulty is:\n{difficulty}")
+        )
+
+    def score_answer(self, question, answer):
+        from .scoring_service import normalize_score
+
+        response = self.client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=[
+                {"role": "system", "content": "Score the candidate answer from 0 to 10 for correctness, relevance, and clarity. Return only a JSON object with a numeric score field."},
+                {"role": "user", "content": f"Question:\n{question}\n\nCandidate answer:\n{answer}"},
+            ],
+            response_format={"type": "json_object"},
+        )
+        data = json.loads(response.choices[0].message.content)
+        return normalize_score(data.get("score", 0))
+
     def ask_question(self, first_question=False):
 
         is_coding_mode = self.interview_mode in ("Coding & problem solving", "Balanced")
