@@ -1,7 +1,10 @@
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import cors_origins
+from .routers.interview import router as interview_router
 from api import app
+
+app.include_router(interview_router)
 
 app.add_middleware(
     CORSMiddleware,
