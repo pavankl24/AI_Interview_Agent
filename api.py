@@ -283,6 +283,10 @@ def submit_answer(data: AnswerRequest, authorization: str | None = Header(defaul
     session["difficulty_streak"] = streak
     if promoted:
         agent.set_difficulty(difficulty)
+        promoted_question, raw = agent.ask_question(question_only=True)
+        response["next_question"] = promoted_question["next_question"]
+        response["is_practical"] = promoted_question["is_practical"]
+        agent.last_ai_response = raw
 
     session["question_count"] += 1
 

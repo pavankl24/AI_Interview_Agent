@@ -124,7 +124,7 @@ When "is_practical" is true, "next_question" must follow the structured coding p
         data = json.loads(response.choices[0].message.content)
         return normalize_score(data.get("score", 0))
 
-    def ask_question(self, first_question=False):
+    def ask_question(self, first_question=False, question_only=False):
 
         is_coding_mode = self.interview_mode in ("Coding & problem solving", "Balanced")
         coding_reminder = (
@@ -145,6 +145,14 @@ Previously asked questions: {self.asked_questions}
 
 Ask exactly one question.
 Return score 0 because there is no candidate answer yet.
+Do not repeat previous questions.{coding_reminder}
+"""
+        elif question_only:
+            question_instruction = f"""
+The candidate's previous answer has already been evaluated. Difficulty has increased to {self.difficulty}.
+Generate exactly one new {self.interview_type} interview question at this new difficulty.
+Do not evaluate the previous answer again. Return an empty string for evaluation and score 0.
+Previously asked questions: {self.asked_questions}
 Do not repeat previous questions.{coding_reminder}
 """
         else:
