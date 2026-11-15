@@ -4,4 +4,6 @@ __pycache__/
 web/preview*.log
 node_modules/
 web/dist/
+dist/
+build/
 *.tsbuildinfo
