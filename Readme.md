@@ -498,6 +498,12 @@ http://127.0.0.1:8000/docs
 
 Interview and compiler endpoints require a valid Supabase Bearer access token.
 
+### API Rate Limits
+
+SlowAPI limits expensive AI calls to 5 interview starts or generated questions per minute, 10 answer evaluations per minute, and 3 report generations per minute. Authenticated routes are bucketed by the user ID in the bearer token; stateless routes fall back to the caller IP. Authentication still validates bearer tokens before interview work begins.
+
+Rate-limit counters use process memory by default. For multiple backend workers or instances, set `RATE_LIMIT_STORAGE_URI` in `backend/.env` to a shared SlowAPI storage backend.
+
 ---
 
 ## Code Execution

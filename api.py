@@ -7,7 +7,7 @@ import uuid
 
 import httpx
 
-from fastapi import FastAPI, HTTPException, Header, Query
+from fastapi import FastAPI, HTTPException, Header, Query, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -23,10 +23,14 @@ from backend.services.session_store import (
     remove_active_session,
     save_active_session,
 )
+from backend.rate_limit import limiter, rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 load_dotenv()
 
 app = FastAPI(title="Cogniv AI Interview Coach API")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 
 def cleanup_interview_sessions() -> None:
@@ -180,7 +184,8 @@ def authenticated_user(authorization: str | None = Header(default=None)) -> str:
 
 
 @app.post("/interview/start")
-def start_interview(data: StartInterviewRequest, authorization: str | None = Header(default=None)):
+@limiter.limit("5/minute")
+def start_interview(request: Request, data: StartInterviewRequest, authorization: str | None = Header(default=None)):
 
     user_id = authenticated_user(authorization)
 
@@ -251,7 +256,8 @@ def resume_interview(data: ResumeInterviewRequest, authorization: str | None = H
 
 
 @app.post("/interview/answer")
-def submit_answer(data: AnswerRequest, authorization: str | None = Header(default=None)):
+@limiter.limit("10/minute")
+def submit_answer(request: Request, data: AnswerRequest, authorization: str | None = Header(default=None)):
 
     user_id = authenticated_user(authorization)
 
@@ -349,7 +355,8 @@ def submit_answer(data: AnswerRequest, authorization: str | None = Header(defaul
 
 
 @app.post("/interview/finish")
-def finish_interview(authorization: str | None = Header(default=None)):
+@limiter.limit("3/minute")
+def finish_interview(request: Request, authorization: str | None = Header(default=None)):
 
     user_id = authenticated_user(authorization)
 

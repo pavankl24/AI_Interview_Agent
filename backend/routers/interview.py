@@ -1,20 +1,22 @@
 import json
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from backend.schemas import EvaluationRequest, EvaluationResponse, QuestionRequest, QuestionResponse
 from backend.services.ai_service import InterviewAgent
+from backend.rate_limit import limiter
 
 router = APIRouter(prefix="/api", tags=["AI interview"])
 logger = logging.getLogger(__name__)
 
 
 @router.post("/question", response_model=QuestionResponse)
-def create_question(request: QuestionRequest):
+@limiter.limit("5/minute")
+def create_question(request: Request, data: QuestionRequest):
     try:
-        agent = InterviewAgent(request.topic.strip(), request.difficulty, request.interview_mode)
-        agent.asked_questions = list(request.previous_questions)
+        agent = InterviewAgent(data.topic.strip(), data.difficulty, data.interview_mode)
+        agent.asked_questions = list(data.previous_questions)
         question, _raw = agent.ask_question(first_question=True)
         return QuestionResponse(question=question["next_question"], is_practical=question["is_practical"])
     except Exception as error:
@@ -23,16 +25,17 @@ def create_question(request: QuestionRequest):
 
 
 @router.post("/evaluate", response_model=EvaluationResponse)
-def evaluate_answer(request: EvaluationRequest):
+@limiter.limit("10/minute")
+def evaluate_answer(request: Request, data: EvaluationRequest):
     try:
-        agent = InterviewAgent(request.topic.strip(), request.difficulty, request.interview_mode)
-        agent.asked_questions = [request.question]
+        agent = InterviewAgent(data.topic.strip(), data.difficulty, data.interview_mode)
+        agent.asked_questions = [data.question]
         prior_turn = (
             '{"evaluation":"","next_question":'
-            + json.dumps(request.question)
+            + json.dumps(data.question)
             + ',"is_practical":false,"score":0}'
         )
-        agent.add_answer(prior_turn, request.answer.strip())
+        agent.add_answer(prior_turn, data.answer.strip())
         result, _raw = agent.ask_question(first_question=False)
         return EvaluationResponse(
             evaluation=result["evaluation"],
