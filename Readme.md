@@ -100,6 +100,7 @@ The AI interviewer evaluates candidate responses and provides structured feedbac
 The interview experience includes:
 
 - Short answer evaluations.
+- Markdown-formatted interview questions with syntax-highlighted code blocks.
 - Next-question generation.
 - Practical versus conceptual question classification.
 - Final interview performance reports.
