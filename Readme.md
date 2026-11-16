@@ -227,7 +227,8 @@ AI_Interview_Agent/
 ├── supabase/
 │   └── migrations/
 │       ├── 001_interview_sessions.sql
-│       └── 002_auth_user_history.sql
+│       ├── 002_auth_user_history.sql
+│       └── 003_active_interview_sessions.sql
 │
 ├── backend/
 │   ├── main.py
@@ -347,6 +348,7 @@ See [Environment Configuration](#environment-configuration).
 ```text
 001_interview_sessions.sql
 002_auth_user_history.sql
+003_active_interview_sessions.sql
 ```
 
 4. Configure the Supabase environment variables.
@@ -421,6 +423,7 @@ The project contains two migration files:
 |---|---|
 | `001_interview_sessions.sql` | Creates the interview session storage structure. |
 | `002_auth_user_history.sql` | Adds authenticated user ownership for interview history. |
+| `003_active_interview_sessions.sql` | Stores resumable interview state with a six-hour expiry. |
 
 ### Stored Interview Information
 

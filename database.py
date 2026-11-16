@@ -1,6 +1,7 @@
 """Optional Supabase persistence for completed interview reports."""
 
 import os
+from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 
 from dotenv import load_dotenv
@@ -38,6 +39,69 @@ def save_interview(payload: dict) -> None:
     client = _client()
     if client is not None:
         client.table("interview_sessions").insert(payload).execute()
+
+
+ACTIVE_SESSION_TTL = timedelta(hours=6)
+
+
+def save_active_interview(client_id: str, session_id: str, payload: dict) -> None:
+    client = _client()
+    if client is None:
+        raise RuntimeError("Supabase must be configured to persist active interviews.")
+    cleanup_expired_active_interviews()
+    now = datetime.now(timezone.utc)
+    client.table("active_interview_sessions").upsert(
+        {
+            "client_id": client_id,
+            "session_id": session_id,
+            "payload": payload,
+            "updated_at": now.isoformat(),
+            "expires_at": (now + ACTIVE_SESSION_TTL).isoformat(),
+        },
+        on_conflict="client_id",
+    ).execute()
+
+
+def get_active_interview(client_id: str) -> dict | None:
+    client = _client()
+    if client is None:
+        raise RuntimeError("Supabase must be configured to retrieve active interviews.")
+    response = (
+        client.table("active_interview_sessions")
+        .select("session_id,payload,expires_at")
+        .eq("client_id", client_id)
+        .limit(1)
+        .execute()
+    )
+    if not response.data:
+        return None
+    stored = response.data[0]
+    expires_at = datetime.fromisoformat(str(stored["expires_at"]).replace("Z", "+00:00"))
+    if expires_at <= datetime.now(timezone.utc):
+        delete_active_interview(client_id)
+        return None
+    payload = dict(stored["payload"])
+    payload["session_id"] = stored["session_id"]
+    return payload
+
+
+def delete_active_interview(client_id: str) -> None:
+    client = _client()
+    if client is not None:
+        client.table("active_interview_sessions").delete().eq("client_id", client_id).execute()
+
+
+def cleanup_expired_active_interviews() -> int:
+    client = _client()
+    if client is None:
+        return 0
+    response = (
+        client.table("active_interview_sessions")
+        .delete()
+        .lt("expires_at", datetime.now(timezone.utc).isoformat())
+        .execute()
+    )
+    return len(response.data or [])
 
 
 def get_interviews(client_id: str) -> list[dict]:

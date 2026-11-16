@@ -100,6 +100,28 @@ When "is_practical" is true, "next_question" must follow the structured coding p
 
         self.asked_questions = []
 
+    def export_state(self):
+        return {
+            "interview_type": self.interview_type,
+            "difficulty": self.difficulty,
+            "interview_mode": self.interview_mode,
+            "messages": self.messages,
+            "asked_questions": self.asked_questions,
+            "last_ai_response": self.last_ai_response,
+        }
+
+    @classmethod
+    def from_state(cls, state):
+        agent = cls(
+            state["interview_type"],
+            state["difficulty"],
+            state["interview_mode"],
+        )
+        agent.messages = state["messages"]
+        agent.asked_questions = state["asked_questions"]
+        agent.last_ai_response = state["last_ai_response"]
+        return agent
+
     def set_difficulty(self, difficulty):
         previous = self.difficulty
         self.difficulty = difficulty

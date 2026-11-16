@@ -17,10 +17,28 @@ from agent import InterviewAgent
 from report import InterviewReport
 from database import get_interviews, is_supabase_configured, save_interview, verify_access_token, get_leaderboard
 from backend.services.difficulty_service import record_score
+from backend.services.session_store import (
+    cleanup_expired_sessions,
+    load_active_session,
+    remove_active_session,
+    save_active_session,
+)
 
 load_dotenv()
 
 app = FastAPI(title="Cogniv AI Interview Coach API")
+
+
+def cleanup_interview_sessions() -> None:
+    try:
+        removed = cleanup_expired_sessions()
+        if removed:
+            logger.info("Cleaned up %s expired interview sessions", removed)
+    except Exception:
+        logger.exception("Could not clean up expired interview sessions")
+
+
+app.add_event_handler("startup", cleanup_interview_sessions)
 
 WEB_DIR = Path(__file__).parent / "web"
 FRONTEND_DIR = WEB_DIR / "dist"
@@ -35,7 +53,6 @@ def web_app():
 def home():
     return FileResponse(FRONTEND_DIR / "index.html")
 
-sessions = {}
 logger = logging.getLogger(__name__)
 
 
@@ -178,7 +195,7 @@ def start_interview(data: StartInterviewRequest, authorization: str | None = Hea
     agent.last_ai_response = raw
 
     session_id = str(uuid.uuid4())
-    sessions[user_id] = {
+    session = {
         "session_id": session_id,
         "agent": agent,
         "report": InterviewReport(interview_type),
@@ -193,6 +210,11 @@ def start_interview(data: StartInterviewRequest, authorization: str | None = Hea
         "current_question": response["next_question"],
         "chat_history": [{"role": "coach", "text": response["next_question"]}],
     }
+    try:
+        save_active_session(session)
+    except Exception as error:
+        logger.exception("Could not persist the active interview session")
+        raise HTTPException(status_code=503, detail="Could not save your interview session. Try again shortly.") from error
 
     return {
         "question_number": 1,
@@ -206,8 +228,12 @@ def start_interview(data: StartInterviewRequest, authorization: str | None = Hea
 @app.post("/interview/resume")
 def resume_interview(data: ResumeInterviewRequest, authorization: str | None = Header(default=None)):
     user_id = authenticated_user(authorization)
-    session = sessions.get(user_id)
-    if not session or session.get("session_id") != data.session_id:
+    try:
+        session = load_active_session(user_id, data.session_id)
+    except Exception as error:
+        logger.exception("Could not retrieve the active interview session")
+        raise HTTPException(status_code=503, detail="Could not load your interview session. Try again shortly.") from error
+    if not session:
         raise HTTPException(status_code=404, detail="No active interview was found. Start a new interview to continue.")
 
     return {
@@ -229,15 +255,23 @@ def submit_answer(data: AnswerRequest, authorization: str | None = Header(defaul
 
     user_id = authenticated_user(authorization)
 
-    if user_id not in sessions:
+    try:
+        session = load_active_session(user_id)
+    except Exception as error:
+        logger.exception("Could not retrieve the active interview session")
+        raise HTTPException(status_code=503, detail="Could not load your interview session. Try again shortly.") from error
+    if not session:
         raise HTTPException(status_code=404, detail="No active interview.")
-
-    session = sessions[user_id]
     agent = session["agent"]
 
     agent.add_answer(agent.last_ai_response, data.answer)
     session["chat_history"].append({"role": "candidate", "text": data.answer})
     if session["question_count"] >= session["max_questions"]:
+        try:
+            save_active_session(session)
+        except Exception as error:
+            logger.exception("Could not persist the final interview answer")
+            raise HTTPException(status_code=503, detail="Could not save your interview progress. Try again shortly.") from error
         score = agent.score_answer(session["current_question"], data.answer)
         difficulty, streak, promoted = record_score(
             session["difficulty"], session.get("difficulty_streak", 0), score
@@ -259,7 +293,7 @@ def submit_answer(data: AnswerRequest, authorization: str | None = Header(defaul
             logger.exception("Could not save completed interview report to Supabase")
             history_persisted = False
 
-        del sessions[user_id]
+        remove_active_session(user_id)
 
         return {
             "evaluation": "Interview completed.",
@@ -295,6 +329,11 @@ def submit_answer(data: AnswerRequest, authorization: str | None = Header(defaul
 
     session["current_question"] = response["next_question"]
     session["chat_history"].append({"role": "coach", "text": response["next_question"]})
+    try:
+        save_active_session(session)
+    except Exception as error:
+        logger.exception("Could not persist interview progress")
+        raise HTTPException(status_code=503, detail="Could not save your interview progress. Try again shortly.") from error
 
     return {
         "evaluation": response["evaluation"],
@@ -314,10 +353,13 @@ def finish_interview(authorization: str | None = Header(default=None)):
 
     user_id = authenticated_user(authorization)
 
-    if user_id not in sessions:
+    try:
+        session = load_active_session(user_id)
+    except Exception as error:
+        logger.exception("Could not retrieve the active interview session")
+        raise HTTPException(status_code=503, detail="Could not load your interview session. Try again shortly.") from error
+    if not session:
         raise HTTPException(status_code=404, detail="No active interview.")
-
-    session = sessions[user_id]
 
     report = session["report"].generate_report(
         session["agent"].messages,
@@ -331,7 +373,7 @@ def finish_interview(authorization: str | None = Header(default=None)):
         logger.exception("Could not save ended interview report to Supabase")
         history_persisted = False
 
-    del sessions[user_id]
+    remove_active_session(user_id)
 
     return {"report": report, "history_persisted": history_persisted}
 
