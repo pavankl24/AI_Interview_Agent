@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Literal
+from contextlib import asynccontextmanager
 import logging
 import asyncio
 import os
@@ -8,10 +9,11 @@ import uuid
 import httpx
 
 from fastapi import FastAPI, HTTPException, Header, Query, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+from postgrest.exceptions import APIError
 
 from agent import InterviewAgent
 from report import InterviewReport
@@ -28,21 +30,32 @@ from slowapi.errors import RateLimitExceeded
 
 load_dotenv()
 
-app = FastAPI(title="Cogniv AI Interview Coach API")
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
-
-
 def cleanup_interview_sessions() -> None:
     try:
         removed = cleanup_expired_sessions()
         if removed:
             logger.info("Cleaned up %s expired interview sessions", removed)
+    except APIError as error:
+        if error.code == "PGRST205":
+            logger.warning(
+                "Active interview storage is not installed in Supabase. "
+                "Apply supabase/migrations/003_active_interview_sessions.sql."
+            )
+            return
+        logger.exception("Could not clean up expired interview sessions")
     except Exception:
         logger.exception("Could not clean up expired interview sessions")
 
 
-app.add_event_handler("startup", cleanup_interview_sessions)
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    cleanup_interview_sessions()
+    yield
+
+
+app = FastAPI(title="Cogniv AI Interview Coach API", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 WEB_DIR = Path(__file__).parent / "web"
 FRONTEND_DIR = WEB_DIR / "dist"
@@ -185,7 +198,7 @@ def authenticated_user(authorization: str | None = Header(default=None)) -> str:
 
 @app.post("/interview/start")
 @limiter.limit("5/minute")
-def start_interview(request: Request, data: StartInterviewRequest, authorization: str | None = Header(default=None)):
+def start_interview(request: Request, response: Response, data: StartInterviewRequest, authorization: str | None = Header(default=None)):
 
     user_id = authenticated_user(authorization)
 
@@ -257,7 +270,7 @@ def resume_interview(data: ResumeInterviewRequest, authorization: str | None = H
 
 @app.post("/interview/answer")
 @limiter.limit("10/minute")
-def submit_answer(request: Request, data: AnswerRequest, authorization: str | None = Header(default=None)):
+def submit_answer(request: Request, response: Response, data: AnswerRequest, authorization: str | None = Header(default=None)):
 
     user_id = authenticated_user(authorization)
 
@@ -356,7 +369,7 @@ def submit_answer(request: Request, data: AnswerRequest, authorization: str | No
 
 @app.post("/interview/finish")
 @limiter.limit("3/minute")
-def finish_interview(request: Request, authorization: str | None = Header(default=None)):
+def finish_interview(request: Request, response: Response, authorization: str | None = Header(default=None)):
 
     user_id = authenticated_user(authorization)
 
