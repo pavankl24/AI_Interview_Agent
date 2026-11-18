@@ -18,7 +18,6 @@ from postgrest.exceptions import APIError
 from agent import InterviewAgent
 from report import InterviewReport
 from database import get_interviews, is_supabase_configured, save_interview, verify_access_token, get_leaderboard
-from backend.services.difficulty_service import record_score
 from backend.services.session_store import (
     cleanup_expired_sessions,
     load_active_session,
@@ -209,7 +208,10 @@ def start_interview(request: Request, response: Response, data: StartInterviewRe
 
     agent = InterviewAgent(interview_type, data.difficulty, data.interview_mode)
 
-    response, raw = agent.ask_question(True)
+    try:
+        response, raw = agent.ask_question(True)
+    except ValueError as error:
+        raise HTTPException(status_code=502, detail="Could not start the interview. Please retry shortly.") from error
     agent.last_ai_response = raw
 
     session_id = str(uuid.uuid4())
@@ -226,6 +228,9 @@ def start_interview(request: Request, response: Response, data: StartInterviewRe
         "candidate_name": data.candidate_name.strip(),
         "practical_questions": bool(response["is_practical"]),
         "current_question": response["next_question"],
+        "current_main_question": response["next_question"],
+        "followup_count": 0,
+        "concepts_tested": [],
         "chat_history": [{"role": "coach", "text": response["next_question"]}],
     }
     try:
@@ -285,25 +290,42 @@ def submit_answer(request: Request, response: Response, data: AnswerRequest, aut
 
     agent.add_answer(agent.last_ai_response, data.answer)
     session["chat_history"].append({"role": "candidate", "text": data.answer})
-    if session["question_count"] >= session["max_questions"]:
+    try:
+        response, raw = agent.assess_answer(
+            session["current_question"], data.answer,
+            followup_count=session.get("followup_count", 0),
+            previous_answers=[item["answer"] for item in agent.evaluation_history[-6:]],
+            concepts_tested=session.get("concepts_tested", []),
+        )
+    except ValueError as error:
+        logger.warning("Interview answer assessment failed: %s", error)
+        raise HTTPException(status_code=502, detail="Could not evaluate that answer. Please try again.") from error
+    agent.last_ai_response = raw
+    session["evaluation_history"] = agent.evaluation_history
+    session["concepts_tested"] = list(dict.fromkeys(session.get("concepts_tested", []) + response["missing_concepts"]))
+    session["difficulty"] = agent.difficulty
+    session["difficulty_streak"] = 0
+
+    if response["action"] == "FOLLOW_UP":
+        session["followup_count"] = session.get("followup_count", 0) + 1
+    elif session["question_count"] >= session["max_questions"]:
         try:
             save_active_session(session)
         except Exception as error:
             logger.exception("Could not persist the final interview answer")
             raise HTTPException(status_code=503, detail="Could not save your interview progress. Try again shortly.") from error
-        score = agent.score_answer(session["current_question"], data.answer)
-        difficulty, streak, promoted = record_score(
-            session["difficulty"], session.get("difficulty_streak", 0), score
-        )
-        session["difficulty"] = difficulty
-        session["difficulty_streak"] = streak
-        if promoted:
-            agent.set_difficulty(difficulty)
+        score = response["score"]
 
-        report = session["report"].generate_report(
-            agent.messages,
-            session["practical_questions"]
-        )
+        try:
+            report = session["report"].generate_report(
+                agent.messages,
+                session["practical_questions"],
+                {"evaluations": agent.evaluation_history, "difficulty_progression": [item.get("next_difficulty") for item in agent.evaluation_history],
+                 "followup_question_count": sum(1 for item in agent.evaluation_history if item.get("action") == "FOLLOW_UP")}
+            )
+        except Exception as error:
+            logger.exception("Could not generate completed interview report")
+            raise HTTPException(status_code=502, detail="Could not generate the interview report. Your session is saved; try ending it again shortly.") from error
 
         try:
             save_interview(_interview_record(session, report))
@@ -315,33 +337,22 @@ def submit_answer(request: Request, response: Response, data: AnswerRequest, aut
         remove_active_session(user_id)
 
         return {
-            "evaluation": "Interview completed.",
+            "evaluation": response["evaluation"],
             "interview_completed": True,
             "report": report,
             "history_persisted": history_persisted,
             "score": score,
-            "difficulty": difficulty,
-            "difficulty_streak": streak,
-            "difficulty_promoted": promoted,
+            "difficulty": session["difficulty"],
+            "difficulty_streak": 0,
+            "difficulty_promoted": False,
+            "evaluation_detail": response,
         }
 
-
-    response, raw = agent.ask_question(False)
-    agent.last_ai_response = raw
     score = response["score"]
-    difficulty, streak, promoted = record_score(
-        session["difficulty"], session.get("difficulty_streak", 0), score
-    )
-    session["difficulty"] = difficulty
-    session["difficulty_streak"] = streak
-    if promoted:
-        agent.set_difficulty(difficulty)
-        promoted_question, raw = agent.ask_question(question_only=True)
-        response["next_question"] = promoted_question["next_question"]
-        response["is_practical"] = promoted_question["is_practical"]
-        agent.last_ai_response = raw
-
-    session["question_count"] += 1
+    if response["action"] == "NEXT_QUESTION":
+        session["question_count"] += 1
+        session["followup_count"] = 0
+        session["current_main_question"] = response["next_question"]
 
     if response["is_practical"]:
         session["practical_questions"] = True
@@ -356,13 +367,15 @@ def submit_answer(request: Request, response: Response, data: AnswerRequest, aut
 
     return {
         "evaluation": response["evaluation"],
+        "evaluation_detail": response,
         "question_number": session["question_count"],
         "max_questions": session["max_questions"],
         "question": response["next_question"],
         "score": score,
-        "difficulty": difficulty,
-        "difficulty_streak": streak,
-        "difficulty_promoted": promoted,
+        "difficulty": session["difficulty"],
+        "difficulty_streak": 0,
+        "difficulty_promoted": False,
+        "followup_count": session["followup_count"],
         "interview_completed": False
     }
 
@@ -381,10 +394,16 @@ def finish_interview(request: Request, response: Response, authorization: str | 
     if not session:
         raise HTTPException(status_code=404, detail="No active interview.")
 
-    report = session["report"].generate_report(
-        session["agent"].messages,
-        session["practical_questions"]
-    )
+    try:
+        report = session["report"].generate_report(
+            session["agent"].messages,
+            session["practical_questions"],
+            {"evaluations": session["agent"].evaluation_history, "difficulty_progression": [item.get("next_difficulty") for item in session["agent"].evaluation_history],
+             "followup_question_count": sum(1 for item in session["agent"].evaluation_history if item.get("action") == "FOLLOW_UP")}
+        )
+    except Exception as error:
+        logger.exception("Could not generate ended interview report")
+        raise HTTPException(status_code=502, detail="Could not generate the interview report. Please retry.") from error
 
     try:
         save_interview(_interview_record(session, report))

@@ -1,224 +1,187 @@
-import os
 import json
+import logging
+import os
+import re
+from typing import Literal
+
 from groq import Groq
+from pydantic import BaseModel, Field, ValidationError, field_validator
+
+logger = logging.getLogger(__name__)
+
+
+class Evaluation(BaseModel):
+    classification: Literal["Excellent", "Good", "Partially Correct", "Incorrect", "Incomplete"]
+    correctness_score: float = Field(ge=0, le=10)
+    understanding_level: Literal["Beginner", "Intermediate", "Advanced"]
+    strengths: list[str] = Field(default_factory=list, max_length=6)
+    missing_concepts: list[str] = Field(default_factory=list, max_length=8)
+    feedback: str = Field(max_length=500)
+
+    @field_validator("correctness_score", mode="before")
+    @classmethod
+    def numeric_score(cls, value):
+        if isinstance(value, bool):
+            raise ValueError("score must be numeric")
+        return float(value)
+
+
+class Decision(BaseModel):
+    action: Literal["FOLLOW_UP", "NEXT_QUESTION"]
+    reason: str = Field(max_length=300)
+    next_difficulty: Literal["Easy", "Medium", "Hard"]
+    next_question: str = Field(min_length=8, max_length=1600)
+    topic: str = Field(min_length=1, max_length=100)
+
+
+class AdaptiveResponse(BaseModel):
+    evaluation: Evaluation
+    interview_decision: Decision
+
+
+class QuestionResponse(BaseModel):
+    evaluation: str = ""
+    next_question: str = Field(min_length=8, max_length=1600)
+    is_practical: bool = False
+    score: float = Field(default=0, ge=0, le=10)
+
+
+def _difficulty(value: str) -> str:
+    return {"Beginner": "Easy", "Intermediate": "Medium", "Advanced": "Hard"}.get(value, value)
+
+
+def _legacy_difficulty(value: str) -> str:
+    return {"Easy": "Beginner", "Medium": "Intermediate", "Hard": "Advanced"}[value]
 
 
 class InterviewAgent:
+    MAX_FOLLOWUPS = 2
 
     def __init__(self, interview_type, difficulty="Intermediate", interview_mode="Balanced"):
         self.interview_type = interview_type
         self.difficulty = difficulty
         self.interview_mode = interview_mode
-        mode_instructions = {
-            "Technical conversation": "Ask conceptual and explanatory technical questions only. Do not ask the candidate to write code, produce a query, or solve an implementation exercise. Mark every question is_practical=false.",
-            "Coding & problem solving": (
-                "Every question must be a hands-on coding, query-writing, implementation, or algorithm problem "
-                "relevant to the selected interview topic. Mark every question is_practical=true. "
-                "IMPORTANT — when is_practical=true, format the next_question field as a well-structured coding "
-                "problem using this exact template:\n\n"
-                "**Problem: <Short Title>**\n\n"
-                "<Clear 2-4 sentence description of what the candidate must implement or solve.>\n\n"
-                "**Example:**\n"
-                "Input: <sample input>\n"
-                "Output: <expected output>\n\n"
-                "**Constraints:**\n"
-                "- <constraint 1>\n"
-                "- <constraint 2>\n\n"
-                "Write your solution in the code editor below and explain your approach."
-            ),
-            "Balanced": (
-                "Mix technical discussion with practical coding, query-writing, or problem-solving questions "
-                "relevant to the topic. Include a practical question within the first two questions and alternate "
-                "formats where possible. Mark is_practical accurately for each question. "
-                "When is_practical=true, format the next_question field as a well-structured coding problem:\n\n"
-                "**Problem: <Short Title>**\n\n"
-                "<Clear 2-4 sentence description of what the candidate must implement or solve.>\n\n"
-                "**Example:**\n"
-                "Input: <sample input>\n"
-                "Output: <expected output>\n\n"
-                "**Constraints:**\n"
-                "- <constraint 1>\n"
-                "- <constraint 2>\n\n"
-                "Write your solution in the code editor below and explain your approach."
-            ),
-        }
-        self.mode_instruction = mode_instructions[interview_mode]
-        self.last_ai_response = ""
         self.client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-        self.messages = [
-            {
-                "role": "system",
-                "content": f"""
-You are a strict technical interviewer conducting a {interview_type} interview at {difficulty} difficulty.
-Interview format: {interview_mode}.
-
-Your job is ONLY to:
-1. Ask one interview question.
-2. Wait for the candidate's answer.
-3. Evaluate the candidate's answer briefly.
-4. Then ask exactly ONE new question.
-
-IMPORTANT RULES:
-
-- NEVER answer your own question.
-- NEVER provide an example answer before the candidate responds.
-- NEVER provide the correct code unless explicitly asked for the answer.
-- If the candidate says "don't know", "idk", gives nonsense, or gives an incomplete answer, briefly say what was missing and move to the next question.
-- Do not turn the interview into a teaching session.
-- Do not repeat previously asked questions.
-- Start with basic questions and gradually increase difficulty.
-- Match question complexity to the selected {difficulty} level.
-- Follow this interview-format instruction: {self.mode_instruction}
-- Keep the questions relevant to {interview_type}.
-- Keep evaluations short, around 1-3 sentences.
-- Include a numeric score from 0 to 10 for the candidate answer. Set score to 0 for the first question because there is no answer yet.
-- Ask exactly one question at the end of every response.
-
-The interview type is:
-{interview_type}
-
-The difficulty is:
-{difficulty}
-
-The candidate's requested interview format is:
-{interview_mode}
-
-Return your response as valid JSON.
-
-The JSON must contain exactly four keys:
-"evaluation", "next_question", "is_practical", and "score".
-"is_practical" must be true if the question requires writing code, solving a programming problem, implementing something, or designing an algorithm.
-"is_practical" must be false for conceptual or theory questions.
-When "is_practical" is true, "next_question" must follow the structured coding problem template described in the format instructions above.
-"""
-            },
-            {
-                "role": "user",
-                "content": f"hello i'm a fresher i'm here to take {interview_type} interview"
-            }
-        ]
-
+        self.messages = [{"role": "system", "content": f"You are a professional, concise technical interviewer for {interview_type}. Ask one question at a time. Never reveal answers or give unsolicited hints. Interview format: {interview_mode}."}, {"role": "user", "content": f"Start a {interview_type} interview."}]
         self.asked_questions = []
+        self.last_ai_response = ""
+        self.evaluation_history = []
 
     def export_state(self):
-        return {
-            "interview_type": self.interview_type,
-            "difficulty": self.difficulty,
-            "interview_mode": self.interview_mode,
-            "messages": self.messages,
-            "asked_questions": self.asked_questions,
-            "last_ai_response": self.last_ai_response,
-        }
+        return {"interview_type": self.interview_type, "difficulty": self.difficulty,
+                "interview_mode": self.interview_mode, "messages": self.messages,
+                "asked_questions": self.asked_questions, "last_ai_response": self.last_ai_response,
+                "evaluation_history": self.evaluation_history}
 
     @classmethod
     def from_state(cls, state):
-        agent = cls(
-            state["interview_type"],
-            state["difficulty"],
-            state["interview_mode"],
-        )
+        agent = cls(state["interview_type"], state["difficulty"], state["interview_mode"])
         agent.messages = state["messages"]
-        agent.asked_questions = state["asked_questions"]
-        agent.last_ai_response = state["last_ai_response"]
+        agent.asked_questions = state.get("asked_questions", [])
+        agent.last_ai_response = state.get("last_ai_response", "")
+        agent.evaluation_history = state.get("evaluation_history", [])
         return agent
 
     def set_difficulty(self, difficulty):
-        previous = self.difficulty
         self.difficulty = difficulty
-        self.messages[0]["content"] = (
-            self.messages[0]["content"]
-            .replace(f"at {previous} difficulty", f"at {difficulty} difficulty")
-            .replace(f"selected {previous} level", f"selected {difficulty} level")
-            .replace(f"The difficulty is:\n{previous}", f"The difficulty is:\n{difficulty}")
-        )
 
-    def score_answer(self, question, answer):
-        from .scoring_service import normalize_score
+    def _completion(self, messages):
+        try:
+            return self.client.chat.completions.create(model="openai/gpt-oss-20b", messages=messages,
+                response_format={"type": "json_object"})
+        except Exception as error:
+            logger.exception("Groq interview request failed")
+            raise ValueError("The interviewer service is unavailable. Please retry shortly.") from error
 
-        response = self.client.chat.completions.create(
-            model="openai/gpt-oss-20b",
-            messages=[
-                {"role": "system", "content": "Score the candidate answer from 0 to 10 for correctness, relevance, and clarity. Return only a JSON object with a numeric score field."},
-                {"role": "user", "content": f"Question:\n{question}\n\nCandidate answer:\n{answer}"},
-            ],
-            response_format={"type": "json_object"},
-        )
-        data = json.loads(response.choices[0].message.content)
-        return normalize_score(data.get("score", 0))
+    @staticmethod
+    def _parse(content, schema):
+        if not content:
+            raise ValueError("The AI returned an empty response.")
+        try:
+            data = json.loads(content)
+            return schema.model_validate(data)
+        except (json.JSONDecodeError, ValidationError, TypeError) as error:
+            logger.warning("Groq returned invalid structured interview data: %s", error)
+            raise ValueError("The interviewer returned an invalid response. Please retry.") from error
 
     def ask_question(self, first_question=False, question_only=False):
+        prompt = f"""Generate exactly one {self.interview_type} interview question at {_difficulty(self.difficulty)} difficulty.
+Interview mode: {self.interview_mode}. Return JSON with keys evaluation (empty string), next_question, is_practical (boolean), score (0).
+Do not repeat any previous question. Previously asked: {self.asked_questions[-20:]}"""
+        response = self._completion(self.messages + [{"role": "user", "content": prompt}])
+        try:
+            data = QuestionResponse.model_validate_json(response.choices[0].message.content)
+            question = data.next_question.strip()
+            if len(question) < 8 or any(question.casefold() == q.casefold() for q in self.asked_questions):
+                raise ValueError("The interviewer returned a duplicate or empty question.")
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
+            logger.warning("Groq returned invalid initial question: %s", error)
+            raise ValueError("The interviewer could not generate a valid question. Please retry.") from error
+        result = {"evaluation": "", "next_question": question,
+                  "is_practical": data.is_practical, "score": 0}
+        self.asked_questions.append(question)
+        self.last_ai_response = json.dumps(result)
+        return result, self.last_ai_response
 
-        is_coding_mode = self.interview_mode in ("Coding & problem solving", "Balanced")
-        coding_reminder = (
-            "\nRemember: if is_practical=true, the next_question MUST follow the structured "
-            "coding problem template (Problem title, description, Example with Input/Output, Constraints)."
-        ) if is_coding_mode else ""
+    def assess_answer(self, question, answer, followup_count=0, previous_answers=None, concepts_tested=None):
+        prompt = f"""Assess the answer to this current interview question. Base the assessment on the candidate's actual response.
+Topic: {self.interview_type}; current difficulty: {_difficulty(self.difficulty)}; format: {self.interview_mode}.
+Current question: {question}
+Candidate answer: {answer}
+Prior answers (for repetition detection): {previous_answers or []}
+Concepts already tested: {concepts_tested or []}
+Follow-ups already asked for this main question: {followup_count} of {self.MAX_FOLLOWUPS}.
+Return JSON matching: {{"evaluation":{{"classification":"Excellent|Good|Partially Correct|Incorrect|Incomplete","correctness_score":0,"understanding_level":"Beginner|Intermediate|Advanced","strengths":[],"missing_concepts":[],"feedback":"concise"}},"interview_decision":{{"action":"FOLLOW_UP|NEXT_QUESTION","reason":"...","next_difficulty":"Easy|Medium|Hard","next_question":"one question only","topic":"..."}}}}.
+Incomplete answers need a focused clarification. Partially Correct answers investigate a stated gap. Incorrect answers get a simpler diagnostic question. Good answers move to a related concept or harder level; excellent answers get a deeper challenge. Ask a follow-up only when useful and follow-up count is under {self.MAX_FOLLOWUPS}; otherwise move to the next main question. Never ask an unrelated question or repeat a previous question. Do not reveal the answer or give a hint. Keep feedback concise. Set a justified difficulty based on demonstrated performance."""
+        raw = self._completion(self.messages + [{"role": "user", "content": prompt}]).choices[0].message.content
+        parsed = self._parse(raw, AdaptiveResponse)
+        evaluation = parsed.evaluation
+        decision = parsed.interview_decision
+        # Enforce bounded follow-ups and sensible actions on the server.
+        if followup_count >= self.MAX_FOLLOWUPS:
+            decision.action = "NEXT_QUESTION"
+        if evaluation.classification in ("Incorrect", "Incomplete", "Partially Correct") and followup_count < self.MAX_FOLLOWUPS:
+            decision.action = "FOLLOW_UP"
+        score = round(max(0, min(10, evaluation.correctness_score)), 1)
+        if any(decision.next_question.casefold() == q.casefold() for q in self.asked_questions):
+            decision.action = "NEXT_QUESTION"
+            decision.next_question = self._generate_distinct_question(decision.next_question)
+        if decision.action == "FOLLOW_UP":
+            current_level = _difficulty(self.difficulty)
+            decision.next_difficulty = (
+                "Medium" if current_level == "Hard" else "Easy" if current_level == "Medium" else "Easy"
+            ) if evaluation.classification == "Incorrect" else current_level
+        elif score >= 8 and _difficulty(self.difficulty) != "Hard":
+            decision.next_difficulty = "Hard" if _difficulty(self.difficulty) == "Medium" and score >= 9 else "Medium"
+        elif score < 5 and _difficulty(self.difficulty) != "Easy":
+            decision.next_difficulty = "Easy" if _difficulty(self.difficulty) == "Medium" else "Medium"
+        self.difficulty = _legacy_difficulty(decision.next_difficulty)
+        self.asked_questions.append(decision.next_question)
+        result = {"evaluation": evaluation.feedback, "score": score,
+                  "classification": evaluation.classification,
+                  "understanding_level": evaluation.understanding_level,
+                  "strengths": evaluation.strengths, "missing_concepts": evaluation.missing_concepts,
+                  "action": decision.action, "reason": decision.reason,
+                  "next_difficulty": decision.next_difficulty,
+                  "topic": decision.topic or self.interview_type,
+                  "next_question": decision.next_question,
+                  "is_practical": self.interview_mode != "Technical conversation" and bool(re.search(r"\b(code|implement|write|algorithm|query|function|solve)\b", decision.next_question, re.I))}
+        self.evaluation_history.append({"question": question, "answer": answer, **result})
+        return result, json.dumps(result)
 
-        if first_question:
-            question_instruction = f"""
-Ask the first {self.interview_type} interview question.
+    def _generate_distinct_question(self, duplicate):
+        prompt = f"Generate one distinct, relevant {self.interview_type} interview question at {_difficulty(self.difficulty)} difficulty. Do not repeat: {self.asked_questions[-20:]}. This question was rejected as duplicate: {duplicate}. Return JSON with next_question, is_practical, evaluation, score."
+        response = self._completion(self.messages + [{"role": "user", "content": prompt}])
+        data = json.loads(response.choices[0].message.content)
+        question = str(data.get("next_question", "")).strip()
+        if len(question) < 8 or any(question.casefold() == q.casefold() for q in self.asked_questions):
+            raise ValueError("The interviewer could not generate a distinct question. Please retry.")
+        return question
 
-There is no candidate answer yet.
-
-Do not evaluate anything.
-Return an empty string for evaluation.
-
-Previously asked questions: {self.asked_questions}
-
-Ask exactly one question.
-Return score 0 because there is no candidate answer yet.
-Do not repeat previous questions.{coding_reminder}
-"""
-        elif question_only:
-            question_instruction = f"""
-The candidate's previous answer has already been evaluated. Difficulty has increased to {self.difficulty}.
-Generate exactly one new {self.interview_type} interview question at this new difficulty.
-Do not evaluate the previous answer again. Return an empty string for evaluation and score 0.
-Previously asked questions: {self.asked_questions}
-Do not repeat previous questions.{coding_reminder}
-"""
-        else:
-            question_instruction = f"""
-Evaluate the candidate's previous answer briefly (1-3 sentences).
-
-Then ask exactly one new {self.interview_type} interview question.
-
-Previously asked questions: {self.asked_questions}
-
-Do not repeat previous questions.{coding_reminder}
-"""
-
-        response = self.client.chat.completions.create(
-            model="openai/gpt-oss-20b",
-            messages=self.messages + [
-                {
-                    "role": "user",
-                    "content": question_instruction
-                }
-            ],
-            response_format={"type": "json_object"}
-        )
-
-        ai_response = response.choices[0].message.content
-
-        data = json.loads(ai_response)
-
-        from .scoring_service import normalize_score
-
-        data["score"] = normalize_score(data.get("score", 0))
-        self.asked_questions.append(data["next_question"])
-        self.last_ai_response = ai_response
-
-        return data, ai_response
+    def score_answer(self, question, answer):
+        result, _ = self.assess_answer(question, answer, followup_count=self.MAX_FOLLOWUPS)
+        return result["score"]
 
     def add_answer(self, ai_response, candidate_answer):
-
-        self.messages.append({
-            "role": "assistant",
-            "content": ai_response
-        })
-
-        self.messages.append({
-            "role": "user",
-            "content": candidate_answer
-        })
+        self.messages.append({"role": "assistant", "content": ai_response})
+        self.messages.append({"role": "user", "content": candidate_answer})
