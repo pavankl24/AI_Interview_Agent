@@ -195,7 +195,7 @@ function escapeHtml(value: string) {
 }
 
 function printAssessmentReport(input: { name: string; topic: string; level: string; mode: string; questions: number; assessedAt: Date; report: Report }) {
-  const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'full', timeStyle: 'short' }).format(input.assessedAt);
+  const when = new Intl.DateTimeFormat(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(input.assessedAt);
   const scoreText = (value?: number | null) => value == null || Number.isNaN(Number(value)) ? 'Not assessed' : `${Number(value).toFixed(1)} / 10`;
   const items = (values?: string[]) => values && values.length
     ? `<ul>${values.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
@@ -206,25 +206,29 @@ function printAssessmentReport(input: { name: string; topic: string; level: stri
 <style>
   @page { size: A4; margin: 18mm 16mm; }
   * { box-sizing: border-box; }
-  body { margin: 0; color: #1c1c1c; background: #fff; font: 14px/1.55 Georgia, "Iowan Old Style", Palatino, serif; }
-  header { display: flex; justify-content: space-between; gap: 24px; padding-bottom: 16px; border-bottom: 2px solid #1c1c1c; }
-  .brand { margin: 0; font: 700 12px/1.2 "Segoe UI", sans-serif; letter-spacing: .16em; }
-  .doc { margin: 6px 0 0; font-size: 22px; font-weight: 600; }
+  body { margin: 0; color: #20242b; background: #fff; font: 12px/1.5 "Segoe UI", Arial, sans-serif; }
+  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding-bottom: 14px; border-bottom: 2px solid #25364d; }
+  .brand { margin: 0; color: #52657c; font: 700 10px/1.2 "Segoe UI", sans-serif; letter-spacing: .14em; text-transform: uppercase; }
+  .doc { margin: 5px 0 0; color: #172b45; font: 650 23px/1.2 "Segoe UI", sans-serif; }
+  .candidate { margin: 4px 0 0; color: #52657c; font-size: 12px; }
   .when { margin: 0; text-align: right; font: 13px/1.45 "Segoe UI", sans-serif; color: #444; }
-  h2 { margin: 28px 0 8px; font: 600 13px/1.2 "Segoe UI", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
-  .meta { width: 100%; margin-top: 18px; border-collapse: collapse; font: 13px/1.4 "Segoe UI", sans-serif; }
-  .meta th { width: 28%; padding: 8px 10px 8px 0; text-align: left; color: #555; font-weight: 600; }
-  .meta td { padding: 8px 0; border-bottom: 1px solid #e4e4e4; }
-  .scores { width: 100%; border-collapse: collapse; font: 13px/1.4 "Segoe UI", sans-serif; }
-  .scores th, .scores td { padding: 10px 12px; border: 1px solid #d8d8d8; text-align: left; }
-  .scores th { background: #f4f4f4; font-weight: 600; }
-  ul { margin: 8px 0 0; padding-left: 18px; }
-  li { margin: 4px 0; }
+  .when-label { display:block; margin-bottom: 3px; color:#758195; font-size:10px; text-transform:uppercase; letter-spacing:.08em; }
+  h2 { margin: 18px 0 7px; color:#25364d; font: 700 11px/1.2 "Segoe UI", sans-serif; letter-spacing: .08em; text-transform: uppercase; break-after: avoid; }
+  .meta { width: 100%; margin-top: 13px; border-collapse: collapse; font: 11px/1.35 "Segoe UI", sans-serif; }
+  .meta th { width: 19%; padding: 5px 10px 5px 0; text-align: left; color: #667085; font-weight: 600; }
+  .meta td { padding: 5px 12px 5px 0; border-bottom: 1px solid #e6e9ee; }
+  .scores { width: 100%; border-collapse: collapse; font: 11px/1.35 "Segoe UI", sans-serif; }
+  .scores th, .scores td { padding: 7px 10px; border: 1px solid #d8dee7; text-align: left; }
+  .scores th { background: #f2f5f8; color:#34445b; font-weight: 650; }
+  ul { margin: 5px 0 0; padding-left: 17px; }
+  li { margin: 2px 0; }
   .narrative { margin: 0; }
   .empty { margin: 0; color: #666; }
-  footer { margin-top: 36px; padding-top: 10px; border-top: 1px solid #1c1c1c; font: 11px/1.4 "Segoe UI", sans-serif; color: #555; }
+  .section { break-inside: avoid; }
+  footer { margin-top: 22px; padding-top: 8px; border-top: 1px solid #d8dee7; font: 10px/1.4 "Segoe UI", sans-serif; color: #667085; }
+  @media print { h2, .section { break-inside: avoid; } }
 </style></head><body>
-<header><div><p class="brand">COGNIV AI</p><h1 class="doc">Interview assessment report</h1></div><p class="when">Assessed<br />${escapeHtml(when)}</p></header>
+<header><div><p class="brand">Cogniv · Interview practice</p><h1 class="doc">Interview assessment</h1><p class="candidate">Prepared for ${escapeHtml(input.name)}</p></div><p class="when"><span class="when-label">Assessment date and time</span>${escapeHtml(when)}</p></header>
 <table class="meta"><tbody>
 <tr><th>Candidate</th><td>${escapeHtml(input.name)}</td></tr>
 <tr><th>Topic</th><td>${escapeHtml(input.topic)}</td></tr>
@@ -232,20 +236,18 @@ function printAssessmentReport(input: { name: string; topic: string; level: stri
 <tr><th>Format</th><td>${escapeHtml(input.mode)}</td></tr>
 <tr><th>Questions</th><td>${input.questions}</td></tr>
 </tbody></table>
-<h2>Scores</h2>
+<section class="section"><h2>Assessment scores</h2>
 <table class="scores"><thead><tr><th>Area</th><th>Result</th></tr></thead><tbody>
 <tr><td>Knowledge</td><td>${scoreText(report.knowledge_score)}</td></tr>
 <tr><td>Problem solving</td><td>${scoreText(report.problem_solving_score)}</td></tr>
 <tr><td>Overall</td><td>${scoreText(report.overall_score)}</td></tr>
 </tbody></table>
-<h2>Strengths</h2>${items(report.strengths)}
-<h2>Areas to improve</h2>${items(report.areas_to_improve)}
-<h2>Observed gaps</h2>${items(report.weaknesses)}
-<h2>Assessment</h2>
-<p class="narrative">${escapeHtml(report.overall_feedback || 'No written assessment was recorded for this session.')}</p>
+<h2>Strengths</h2>${items(report.strengths)}</section>
+<section class="section"><h2>Development priorities</h2>${items(report.areas_to_improve?.length ? report.areas_to_improve : report.weaknesses)}</section>
+<section class="section"><h2>Evaluator summary</h2><p class="narrative">${escapeHtml(report.overall_feedback || 'No written assessment was recorded for this session.')}</p></section>
 <footer>Prepared for ${escapeHtml(input.name)} · ${escapeHtml(when)} · Cogniv AI interview assessment</footer>
 </body></html>`;
-  const frame = window.open('', '_blank', 'noopener,noreferrer,width=900,height=1100');
+  const frame = window.open('', '_blank', 'width=900,height=1100');
   if (!frame) return false;
   frame.document.open();
   frame.document.write(html);
