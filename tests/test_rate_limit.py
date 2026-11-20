@@ -1,7 +1,7 @@
 import base64
 import json
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.testclient import TestClient
 from slowapi.errors import RateLimitExceeded
 
@@ -45,7 +45,7 @@ def test_rate_limit_returns_frontend_friendly_429():
 
     @app.get("/rate-limit-test")
     @limiter.limit("1/minute")
-    def limited_endpoint(request: Request):
+    def limited_endpoint(request: Request, response: Response):
         return {"ok": True}
 
     client = TestClient(app)

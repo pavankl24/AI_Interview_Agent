@@ -13,6 +13,7 @@ def agent_with_response(monkeypatch, classification, score, action="NEXT_QUESTIO
     agent.interview_mode = "Technical conversation"
     agent.messages = []
     agent.asked_questions = ["What is a list?"]
+    agent.last_ai_response = ""
     agent.evaluation_history = []
     agent.client = None
     payload = {
