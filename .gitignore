@@ -1,4 +1,5 @@
 venv/
+.venv-repaired/
 .env
 __pycache__/
 web/preview*.log
