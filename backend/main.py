@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import cors_origins
 from .routers.interview import router as interview_router
 from .routers.learning import router as learning_router
+from .routers.resume import router as resume_router
 from api import app
 
 web_mount = next((route for route in app.router.routes if getattr(route, "name", "") == "web"), None)
@@ -11,6 +12,7 @@ if web_mount is not None:
 
 app.include_router(interview_router)
 app.include_router(learning_router)
+app.include_router(resume_router)
 
 app.add_middleware(
     CORSMiddleware,
