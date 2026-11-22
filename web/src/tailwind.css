@@ -223,6 +223,20 @@ body, .app-shell, .main-area { background: var(--bg) !important; color: var(--te
 .compiler-result pre { min-height: 48px; max-height: 220px; overflow: auto; margin: 10px 0; color: #ededed; font: 12px/1.6 Consolas, 'SFMono-Regular', monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .compiler-result .link-btn { padding: 0; font-size: 12px; }
 .compiler-buttons { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.resume-page { display: grid; gap: 16px; }
+.resume-page .panel { padding: 20px; }
+.resume-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.resume-toolbar select { flex:1; min-width:220px; }
+.resume-edit-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 16px; }
+.resume-page .code-label { display:grid; align-items:stretch; gap:6px; }
+.resume-page h2 { margin:0 0 10px; }
+.resume-page h3 { margin:16px 0 8px; }
+.resume-fact,.resume-turn { margin:10px 0; padding:14px; border:1px solid #303033; border-radius:10px; background:#19191b; }
+.resume-fact p,.resume-turn p { margin:6px 0; white-space:pre-wrap; }
+.resume-match { margin-top:12px; }
+.resume-chat { display:grid; gap:14px; }
+.resume-page .optional-tag { font-size:12px; color:#a1a1a6; }
+@media(max-width:650px) { .resume-edit-grid { grid-template-columns:1fr; } .resume-toolbar { align-items:stretch; flex-direction:column; } .resume-toolbar>* { width:100%; } .resume-page .panel { padding:16px; } }
 @media (max-width: 650px) {
   .coding-workbench { padding: 16px; }
   .coding-heading { align-items: stretch; flex-direction: column; gap: 12px; }

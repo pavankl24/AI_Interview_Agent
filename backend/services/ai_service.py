@@ -17,6 +17,10 @@ class Evaluation(BaseModel):
     strengths: list[str] = Field(default_factory=list, max_length=6)
     missing_concepts: list[str] = Field(default_factory=list, max_length=8)
     feedback: str = Field(max_length=500)
+    claim_supported: bool = True
+    depth_score: float = Field(default=0, ge=0, le=10)
+    clarity_score: float = Field(default=0, ge=0, le=10)
+    practical_score: float = Field(default=0, ge=0, le=10)
 
     @field_validator("correctness_score", mode="before")
     @classmethod
@@ -57,19 +61,21 @@ def _legacy_difficulty(value: str) -> str:
 class InterviewAgent:
     MAX_FOLLOWUPS = 2
 
-    def __init__(self, interview_type, difficulty="Intermediate", interview_mode="Balanced"):
+    def __init__(self, interview_type, difficulty="Intermediate", interview_mode="Balanced", context=None):
         self.interview_type = interview_type
         self.difficulty = difficulty
         self.interview_mode = interview_mode
         self.client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-        self.messages = [{"role": "system", "content": f"You are a professional, concise technical interviewer for {interview_type}. Ask one question at a time. Never reveal answers or give unsolicited hints. Interview format: {interview_mode}."}, {"role": "user", "content": f"Start a {interview_type} interview."}]
+        self.context = context or {}
+        grounding = (" Candidate context (use only these facts; never invent projects, skills, employers, or achievements): " + json.dumps(self.context, ensure_ascii=False)[:16000]) if self.context else ""
+        self.messages = [{"role": "system", "content": f"You are a professional, concise technical interviewer for {interview_type}. Ask one question at a time. Never reveal answers or give unsolicited hints. Interview format: {interview_mode}." + grounding}, {"role": "user", "content": f"Start a {interview_type} interview."}]
         self.asked_questions = []
         self.last_ai_response = ""
         self.evaluation_history = []
 
     def export_state(self):
         return {"interview_type": self.interview_type, "difficulty": self.difficulty,
-                "interview_mode": self.interview_mode, "messages": self.messages,
+                "interview_mode": self.interview_mode, "messages": self.messages, "context": self.context,
                 "asked_questions": self.asked_questions, "last_ai_response": self.last_ai_response,
                 "evaluation_history": self.evaluation_history}
 
@@ -77,6 +83,7 @@ class InterviewAgent:
     def from_state(cls, state):
         agent = cls(state["interview_type"], state["difficulty"], state["interview_mode"])
         agent.messages = state["messages"]
+        agent.context = state.get("context", {})
         agent.asked_questions = state.get("asked_questions", [])
         agent.last_ai_response = state.get("last_ai_response", "")
         agent.evaluation_history = state.get("evaluation_history", [])
@@ -107,7 +114,8 @@ class InterviewAgent:
     def ask_question(self, first_question=False, question_only=False):
         prompt = f"""Generate exactly one {self.interview_type} interview question at {_difficulty(self.difficulty)} difficulty.
 Interview mode: {self.interview_mode}. Return JSON with keys evaluation (empty string), next_question, is_practical (boolean), score (0).
-Do not repeat any previous question. Previously asked: {self.asked_questions[-20:]}"""
+Do not repeat any previous question. Previously asked: {self.asked_questions[-20:]}
+Candidate context: {json.dumps(self.context, ensure_ascii=False)[:16000]}. Use only supported context facts."""
         response = self._completion(self.messages + [{"role": "user", "content": prompt}])
         try:
             data = QuestionResponse.model_validate_json(response.choices[0].message.content)
@@ -130,8 +138,9 @@ Current question: {question}
 Candidate answer: {answer}
 Prior answers (for repetition detection): {previous_answers or []}
 Concepts already tested: {concepts_tested or []}
+Candidate context: {json.dumps(self.context, ensure_ascii=False)[:16000]}. Treat this as the only source of resume facts; distinguish an unsupported claim from an incorrect technical answer.
 Follow-ups already asked for this main question: {followup_count} of {self.MAX_FOLLOWUPS}.
-Return JSON matching: {{"evaluation":{{"classification":"Excellent|Good|Partially Correct|Incorrect|Incomplete","correctness_score":0,"understanding_level":"Beginner|Intermediate|Advanced","strengths":[],"missing_concepts":[],"feedback":"concise"}},"interview_decision":{{"action":"FOLLOW_UP|NEXT_QUESTION","reason":"...","next_difficulty":"Easy|Medium|Hard","next_question":"one question only","topic":"..."}}}}.
+Return JSON matching: {{"evaluation":{{"classification":"Excellent|Good|Partially Correct|Incorrect|Incomplete","correctness_score":0,"depth_score":0,"clarity_score":0,"practical_score":0,"claim_supported":true,"understanding_level":"Beginner|Intermediate|Advanced","strengths":[],"missing_concepts":[],"feedback":"concise"}},"interview_decision":{{"action":"FOLLOW_UP|NEXT_QUESTION","reason":"...","next_difficulty":"Easy|Medium|Hard","next_question":"one question only","topic":"..."}}}}.
 Incomplete answers need a focused clarification. Partially Correct answers investigate a stated gap. Incorrect answers get a simpler diagnostic question. Good answers move to a related concept or harder level; excellent answers get a deeper challenge. Ask a follow-up only when useful and follow-up count is under {self.MAX_FOLLOWUPS}; otherwise move to the next main question. Never ask an unrelated question or repeat a previous question. Do not reveal the answer or give a hint. Keep feedback concise. Set a justified difficulty based on demonstrated performance."""
         raw = self._completion(self.messages + [{"role": "user", "content": prompt}]).choices[0].message.content
         parsed = self._parse(raw, AdaptiveResponse)
@@ -159,6 +168,11 @@ Incomplete answers need a focused clarification. Partially Correct answers inves
         self.asked_questions.append(decision.next_question)
         result = {"evaluation": evaluation.feedback, "score": score,
                   "classification": evaluation.classification,
+                  "correctness_score": evaluation.correctness_score,
+                  "depth_score": evaluation.depth_score,
+                  "clarity_score": evaluation.clarity_score,
+                  "practical_score": evaluation.practical_score,
+                  "claim_supported": evaluation.claim_supported,
                   "understanding_level": evaluation.understanding_level,
                   "strengths": evaluation.strengths, "missing_concepts": evaluation.missing_concepts,
                   "action": decision.action, "reason": decision.reason,

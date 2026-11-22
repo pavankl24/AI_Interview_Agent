@@ -46,7 +46,36 @@ def _reports(user_id: str) -> list[dict]:
     if client is None:
         return []
     res = client.table("interview_sessions").select("id,topic,difficulty,overall_score,report,created_at").eq("client_id", user_id).order("created_at", desc=True).limit(50).execute()
-    return res.data or []
+    reports = res.data or []
+    resume_rows = client.table("resume_interview_sessions").select("id,report,completed_at").eq("user_id", user_id).eq("status", "completed").order("completed_at", desc=True).limit(50).execute().data or []
+    reports.extend({"id": row["id"], "topic": "Resume interview", "difficulty": "Intermediate", "overall_score": (row.get("report") or {}).get("overall_score"), "report": row.get("report") or {}, "created_at": row.get("completed_at")} for row in resume_rows)
+    return reports
+
+
+def sync_resume_interview(user_id: str) -> dict:
+    """Append only new evidence-based topics to an existing roadmap, preserving progress."""
+    client = _client()
+    if client is None:
+        return {"added": 0}
+    roadmaps = client.table("learning_roadmaps").select("id").eq("user_id", user_id).order("created_at", desc=True).limit(1).execute().data or []
+    if not roadmaps:
+        return {"added": 0}
+    roadmap_id = roadmaps[0]["id"]
+    rows = client.table("learning_tasks").select("topic,sequence").eq("roadmap_id", roadmap_id).execute().data or []
+    existing = {str(row["topic"]).casefold().strip() for row in rows}
+    plan = generate_plan(_reports(user_id), None)
+    sequence = max((int(row["sequence"]) for row in rows), default=-1) + 1
+    added = 0
+    for task in plan.tasks:
+        key = task.topic.casefold().strip()
+        if key in existing:
+            continue
+        payload = task.model_dump()
+        payload.update({"roadmap_id": roadmap_id, "sequence": sequence + added, "status": "Not Started"})
+        client.table("learning_tasks").insert(payload).execute()
+        existing.add(key)
+        added += 1
+    return {"added": added}
 
 
 def analyze(reports: list[dict]) -> list[dict]:
