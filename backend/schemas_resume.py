@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ResumeProfile(BaseModel):
@@ -13,6 +13,29 @@ class ResumeProfile(BaseModel):
     projects: list[dict] = Field(default_factory=list, max_length=30)
     experience: list[dict] = Field(default_factory=list, max_length=30)
     certifications: list[str] = Field(default_factory=list, max_length=40)
+
+    @field_validator("education", mode="before")
+    @classmethod
+    def normalize_education(cls, value):
+        """Accept structured education records returned by resume parsers."""
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            value = [value]
+        normalized = []
+        for item in value:
+            if isinstance(item, str):
+                text = item.strip()
+            elif isinstance(item, dict):
+                # Model output has used both common variants of these keys.
+                text = " · ".join(str(item[key]).strip() for key in
+                    ("degree", "field", "institution", "school", "graduation_year", "expected_year", "year")
+                    if item.get(key) not in (None, ""))
+            else:
+                text = str(item).strip()
+            if text:
+                normalized.append(text[:500])
+        return normalized
 
 
 class ProfileUpdate(BaseModel):

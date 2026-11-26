@@ -116,8 +116,18 @@ def generate_plan(reports: list[dict], goal: str | None) -> Plan:
     gaps = analyze(reports)
     if not gaps and not goal:
         raise ValueError("Add a learning goal to create a starter roadmap, or complete an interview first.")
-    evidence = {"gaps": gaps, "reports": [{"topic": r.get("topic"), "score": r.get("overall_score"), "report": r.get("report")} for r in reports[:10]], "goal": goal}
-    prompt = "Create a specific, staged learning roadmap from this candidate evidence. Include only weak/revision concepts and explicitly stated goal topics; strong topics are context, not tasks. Unknown topics are not weak. Use stage exactly one of Foundation, Improvement, Practice, Advanced, Assessment; priority High, Medium, Low; understanding Strong, Revision, Weak, Not Assessed; and all task/exercise difficulties Easy, Medium, Hard. Include 1-3 progressively harder coding exercises for applicable programming concepts, with public sample examples and private tests as input/output pairs. Keep solutions out. Return JSON {tasks:[{topic,description,stage,priority,understanding,difficulty,estimated_minutes,prerequisites,completion_criteria,exercises:[{title,problem,difficulty,input_example,output_example,constraints,concepts,tests:[{input,output}]}]}]}. " + json.dumps(evidence, ensure_ascii=False)[:12000]
+    # Keep goal and evidence in separate bounded fields. Slicing serialized JSON
+    # could silently cut off the goal or leave malformed evidence at the end.
+    compact_reports = []
+    for row in reports[:10]:
+        report = row.get("report") if isinstance(row.get("report"), dict) else {}
+        compact_reports.append({"topic": row.get("topic"), "score": row.get("overall_score"),
+            "strengths": report.get("strengths", [])[:8],
+            "weaknesses": report.get("weaknesses", [])[:8],
+            "areas_to_improve": report.get("areas_to_improve", [])[:8],
+            "topics_to_improve": report.get("topics_to_improve", [])[:8]})
+    evidence = {"learning_goal": goal, "evidence_gaps": gaps[:40], "recent_interview_evidence": compact_reports}
+    prompt = "Design a useful, beginner-aware learning roadmap. Treat learning_goal as the learner's direct request: decompose a broad goal into a coherent curriculum of prerequisite and progressively advanced topics (for example, machine learning should cover Python/data foundations, math, data preparation, core supervised and unsupervised methods, evaluation, and a practical project). Do not reduce a broad goal to one task. Include 6-12 sequenced tasks when a goal is provided, covering the goal end to end. Interview evidence may prioritize or supplement this curriculum; only mark concepts Weak or Revision when supported by evidence. For a goal-only topic use understanding Not Assessed. Each task must be actionable and explain what to learn and how to demonstrate it. Use stage exactly one of Foundation, Improvement, Practice, Advanced, Assessment; priority High, Medium, Low; understanding Strong, Revision, Weak, Not Assessed; and all task/exercise difficulties Easy, Medium, Hard. Include 1-3 progressively harder exercises for applicable programming concepts, with public sample examples and private tests as input/output pairs. Keep solutions out. Return valid JSON with a tasks array; each task has topic, description, stage, priority, understanding, difficulty, estimated_minutes, prerequisites, completion_criteria, exercises; each exercise has title, problem, difficulty, input_example, output_example, constraints, concepts, tests (each test has input and output). LEARNER CONTEXT: " + json.dumps(evidence, ensure_ascii=False)
     client = Groq(api_key=os.getenv("GROQ_API_KEY"))
     response = client.chat.completions.create(model="openai/gpt-oss-20b", messages=[{"role":"system","content":"You are a precise learning designer. Ground every recommendation in given evidence. Never claim unassessed concepts are weak."},{"role":"user","content":prompt}], response_format={"type":"json_object"})
     try:
@@ -168,15 +178,24 @@ def create_learning(user_id: str, goal: str | None) -> dict:
     client = _client()
     if client is None: raise RuntimeError("Learning storage is not configured.")
     existing = get_learning(user_id)
-    if existing["roadmap"]:
+    if existing["roadmap"] and not goal:
         return existing
     reports = _reports(user_id)
     plan = generate_plan(reports, goal)
-    source = "interview" if analyze(reports) else "goal"
-    roadmap = client.table("learning_roadmaps").insert({"user_id": user_id, "goal": goal, "source": source}).execute().data[0]
-    for index, task in enumerate(plan.tasks):
+    source = "goal" if goal else "interview"
+    if existing["roadmap"]:
+        roadmap = existing["roadmap"]
+        client.table("learning_roadmaps").update({"goal": goal, "source": source, "updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", roadmap["id"]).execute()
+        existing_topics = {str(task["topic"]).casefold().strip() for task in existing["tasks"]}
+        first_sequence = max((int(task.get("sequence", -1)) for task in existing["tasks"]), default=-1) + 1
+        tasks_to_save = [task for task in plan.tasks if task.topic.casefold().strip() not in existing_topics]
+    else:
+        roadmap = client.table("learning_roadmaps").insert({"user_id": user_id, "goal": goal, "source": source}).execute().data[0]
+        first_sequence = 0
+        tasks_to_save = plan.tasks
+    for index, task in enumerate(tasks_to_save):
         payload = task.model_dump()
-        payload.update({"roadmap_id": roadmap["id"], "sequence": index, "status": "Not Started"})
+        payload.update({"roadmap_id": roadmap["id"], "sequence": first_sequence + index, "status": "Not Started"})
         client.table("learning_tasks").insert(payload).execute()
     return get_learning(user_id)
 
