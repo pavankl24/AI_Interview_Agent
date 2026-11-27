@@ -350,6 +350,8 @@ See [Environment Configuration](#environment-configuration).
 001_interview_sessions.sql
 002_auth_user_history.sql
 003_active_interview_sessions.sql
+004_learning_roadmaps.sql
+005_resume_interviews.sql
 ```
 
 4. Configure the Supabase environment variables.

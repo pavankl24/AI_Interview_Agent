@@ -5,7 +5,7 @@ from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
 from backend.rate_limit import limiter
 from backend.schemas_resume import AnswerSubmission, InterviewStart, MatchRequest, ProfileUpdate
 from backend.services import resume_service as service
-from database import verify_access_token
+from database import is_supabase_configured, verify_access_token
 
 router = APIRouter(prefix="/api/resumes", tags=["Resume interviews"])
 logger = logging.getLogger(__name__)
@@ -26,7 +26,20 @@ def invoke(fn, *args):
     except HTTPException: raise
     except Exception as error:
         logger.exception("Resume interview request failed")
-        raise HTTPException(status_code=503, detail="Resume service is unavailable. Check Supabase and Groq configuration.") from error
+        error_code = str(getattr(error, "code", ""))
+        error_module = type(error).__module__.lower()
+        error_name = type(error).__name__.lower()
+        if not is_supabase_configured():
+            detail = "Resume storage is not configured. Set SUPABASE_URL and SUPABASE_SECRET_KEY in the backend environment, then restart the server."
+        elif error_code in {"42P01", "PGRST205"}:
+            detail = "Resume tables are missing in Supabase. Run supabase/migrations/005_resume_interviews.sql in the SQL Editor."
+        elif error_code == "42501":
+            detail = "Supabase denied access to resume storage. Verify the server uses the Supabase secret or service-role key and that migration 005 was applied."
+        elif "groq" in error_module or "groq" in error_name:
+            detail = "Groq could not complete the resume request. Check GROQ_API_KEY and the Groq API response in the backend terminal."
+        else:
+            detail = f"Resume request failed ({type(error).__name__}). See the backend terminal traceback for details."
+        raise HTTPException(status_code=503, detail=detail) from error
 
 
 @router.get("")
