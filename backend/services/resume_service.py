@@ -15,6 +15,44 @@ from database import _client
 MAX_UPLOAD = 5 * 1024 * 1024
 ALLOWED = {"application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
 
+RESUME_PROFILE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "summary": {"type": "string"},
+        "education": {"type": "array", "items": {"type": "string"}},
+        "technical_skills": {"type": "array", "items": {"type": "string"}},
+        "programming_languages": {"type": "array", "items": {"type": "string"}},
+        "frameworks_tools": {"type": "array", "items": {"type": "string"}},
+        "projects": {"type": "array", "items": {"type": "object", "properties": {
+            "name": {"type": "string"}, "description": {"type": "string"},
+            "technologies": {"type": "array", "items": {"type": "string"}},
+        }, "required": ["name", "description", "technologies"], "additionalProperties": False}},
+        "experience": {"type": "array", "items": {"type": "object", "properties": {
+            "title": {"type": "string"}, "organization": {"type": "string"},
+            "description": {"type": "string"},
+        }, "required": ["title", "organization", "description"], "additionalProperties": False}},
+        "certifications": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["name", "summary", "education", "technical_skills", "programming_languages",
+                 "frameworks_tools", "projects", "experience", "certifications"],
+    "additionalProperties": False,
+}
+
+JOB_MATCH_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "required_skills": {"type": "array", "items": {"type": "string"}},
+        "preferred_skills": {"type": "array", "items": {"type": "string"}},
+        "required_experience": {"type": "string"},
+        "responsibilities": {"type": "array", "items": {"type": "string"}},
+        "technologies": {"type": "array", "items": {"type": "string"}},
+        "expectations": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["required_skills", "preferred_skills", "required_experience", "responsibilities", "technologies", "expectations"],
+    "additionalProperties": False,
+}
+
 
 def extract_document(filename: str, content_type: str, content: bytes) -> str:
     if len(content) > MAX_UPLOAD:
@@ -41,8 +79,10 @@ def extract_document(filename: str, content_type: str, content: bytes) -> str:
 
 def analyze_resume(text: str) -> ResumeProfile:
     response = Groq(api_key=os.getenv("GROQ_API_KEY")).chat.completions.create(
-        model="openai/gpt-oss-20b", response_format={"type": "json_object"},
-        messages=[{"role": "system", "content": "Extract only facts explicitly present in this resume. Never invent projects, skills, dates, or achievements. Return JSON matching name, summary, education[], technical_skills[], programming_languages[], frameworks_tools[], projects[{name,description,technologies}], experience[{title,organization,description}], certifications[]."},
+        model="openai/gpt-oss-20b", reasoning_effort="low",
+        response_format={"type": "json_schema", "json_schema": {
+            "name": "resume_profile", "strict": True, "schema": RESUME_PROFILE_SCHEMA}},
+        messages=[{"role": "system", "content": "Extract only facts explicitly present in this resume. Never invent projects, skills, dates, or achievements. Put each education entry in one concise string. For missing values, use an empty string or empty array. Return only the requested resume profile."},
                   {"role": "user", "content": text}])
     return ResumeProfile.model_validate_json(response.choices[0].message.content)
 
@@ -50,9 +90,12 @@ def analyze_resume(text: str) -> ResumeProfile:
 def match_job(profile: dict, description: str) -> dict:
     candidate = {str(s).casefold(): str(s) for s in profile.get("technical_skills", []) + profile.get("programming_languages", []) + profile.get("frameworks_tools", [])}
     # Skills are the resume's explicitly extracted skill inventory. Score is matched required skills / identified required skills.
-    response = Groq(api_key=os.getenv("GROQ_API_KEY")).chat.completions.create(model="openai/gpt-oss-20b", response_format={"type":"json_object"}, messages=[
-        {"role":"system","content":"Analyze job description. Return JSON {required_skills:[string], preferred_skills:[string], required_experience:string, responsibilities:[string], technologies:[string], expectations:[string]}. Extract explicit requirements only."},
-        {"role":"user","content":description}])
+    response = Groq(api_key=os.getenv("GROQ_API_KEY")).chat.completions.create(
+        model="openai/gpt-oss-20b", reasoning_effort="low",
+        response_format={"type": "json_schema", "json_schema": {
+            "name": "job_requirements", "strict": True, "schema": JOB_MATCH_SCHEMA}},
+        messages=[{"role":"system","content":"Extract only explicit job requirements. Do not infer or invent requirements. Use empty strings or arrays when information is absent."},
+                  {"role":"user","content":description}])
     job = json.loads(response.choices[0].message.content)
     required = list(dict.fromkeys(str(x).strip() for x in job.get("required_skills", []) if str(x).strip()))
     preferred = list(dict.fromkeys(str(x).strip() for x in job.get("preferred_skills", []) if str(x).strip()))

@@ -41,6 +41,35 @@ class Plan(BaseModel):
     tasks: list[Task] = Field(min_length=1, max_length=20)
 
 
+PLAN_SCHEMA = {
+    "type": "object",
+    "properties": {"tasks": {"type": "array", "items": {"type": "object", "properties": {
+        "topic": {"type": "string"}, "description": {"type": "string"},
+        "stage": {"type": "string", "enum": ["Foundation", "Improvement", "Practice", "Advanced", "Assessment"]},
+        "priority": {"type": "string", "enum": ["High", "Medium", "Low"]},
+        "understanding": {"type": "string", "enum": ["Strong", "Revision", "Weak", "Not Assessed"]},
+        "difficulty": {"type": "string", "enum": ["Easy", "Medium", "Hard"]},
+        "estimated_minutes": {"type": "integer"},
+        "prerequisites": {"type": "array", "items": {"type": "string"}},
+        "completion_criteria": {"type": "string"},
+        "exercises": {"type": "array", "items": {"type": "object", "properties": {
+            "title": {"type": "string"}, "problem": {"type": "string"},
+            "difficulty": {"type": "string", "enum": ["Easy", "Medium", "Hard"]},
+            "input_example": {"type": "string"}, "output_example": {"type": "string"},
+            "constraints": {"type": "array", "items": {"type": "string"}},
+            "concepts": {"type": "array", "items": {"type": "string"}},
+            "tests": {"type": "array", "items": {"type": "object", "properties": {
+                "input": {"type": "string"}, "output": {"type": "string"},
+            }, "required": ["input", "output"], "additionalProperties": False}},
+        }, "required": ["title", "problem", "difficulty", "input_example", "output_example",
+                        "constraints", "concepts", "tests"], "additionalProperties": False}},
+    }, "required": ["topic", "description", "stage", "priority", "understanding", "difficulty",
+                    "estimated_minutes", "prerequisites", "completion_criteria", "exercises"],
+       "additionalProperties": False}}},
+    "required": ["tasks"], "additionalProperties": False,
+}
+
+
 def _reports(user_id: str) -> list[dict]:
     client = _client()
     if client is None:
@@ -129,7 +158,12 @@ def generate_plan(reports: list[dict], goal: str | None) -> Plan:
     evidence = {"learning_goal": goal, "evidence_gaps": gaps[:40], "recent_interview_evidence": compact_reports}
     prompt = "Design a useful, beginner-aware learning roadmap. Treat learning_goal as the learner's direct request: decompose a broad goal into a coherent curriculum of prerequisite and progressively advanced topics (for example, machine learning should cover Python/data foundations, math, data preparation, core supervised and unsupervised methods, evaluation, and a practical project). Do not reduce a broad goal to one task. Include 6-12 sequenced tasks when a goal is provided, covering the goal end to end. Interview evidence may prioritize or supplement this curriculum; only mark concepts Weak or Revision when supported by evidence. For a goal-only topic use understanding Not Assessed. Each task must be actionable and explain what to learn and how to demonstrate it. Use stage exactly one of Foundation, Improvement, Practice, Advanced, Assessment; priority High, Medium, Low; understanding Strong, Revision, Weak, Not Assessed; and all task/exercise difficulties Easy, Medium, Hard. Include 1-3 progressively harder exercises for applicable programming concepts, with public sample examples and private tests as input/output pairs. Keep solutions out. Return valid JSON with a tasks array; each task has topic, description, stage, priority, understanding, difficulty, estimated_minutes, prerequisites, completion_criteria, exercises; each exercise has title, problem, difficulty, input_example, output_example, constraints, concepts, tests (each test has input and output). LEARNER CONTEXT: " + json.dumps(evidence, ensure_ascii=False)
     client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-    response = client.chat.completions.create(model="openai/gpt-oss-20b", messages=[{"role":"system","content":"You are a precise learning designer. Ground every recommendation in given evidence. Never claim unassessed concepts are weak."},{"role":"user","content":prompt}], response_format={"type":"json_object"})
+    response = client.chat.completions.create(
+        model="openai/gpt-oss-20b", reasoning_effort="low", max_completion_tokens=16000,
+        messages=[{"role":"system","content":"You are a precise learning designer. Ground every recommendation in given evidence. Never claim unassessed concepts are weak. Fill every field in the required output schema; use empty arrays when there are no items."},
+                  {"role":"user","content":prompt}],
+        response_format={"type":"json_schema", "json_schema": {
+            "name": "learning_plan", "strict": True, "schema": PLAN_SCHEMA}})
     try:
         return Plan.model_validate_json(response.choices[0].message.content)
     except (ValidationError, ValueError, TypeError) as error:

@@ -37,7 +37,18 @@ def start_learning(request: Request, data: GoalRequest, authorization: str | Non
     except ValueError as error: raise HTTPException(status_code=422, detail=str(error)) from error
     except Exception as error:
         logger.exception("Could not create learning roadmap")
-        raise HTTPException(status_code=502, detail="Could not generate your roadmap. Check Supabase and Groq configuration.") from error
+        error_code = str(getattr(error, "code", ""))
+        error_module = type(error).__module__.lower()
+        error_name = type(error).__name__.lower()
+        if error_code in {"42P01", "PGRST205"}:
+            detail = "Learning tables are missing in Supabase. Run supabase/migrations/004_learning_roadmaps.sql in the SQL Editor."
+        elif error_code == "42501":
+            detail = "Supabase denied access to learning storage. Verify the server uses the Supabase secret or service-role key and that migration 004 was applied."
+        elif "groq" in error_module or "groq" in error_name:
+            detail = "Groq could not generate the roadmap. Check GROQ_API_KEY and the Groq API response in the backend terminal."
+        else:
+            detail = f"Roadmap request failed ({type(error).__name__}). See the backend terminal traceback for details."
+        raise HTTPException(status_code=502, detail=detail) from error
 
 
 @router.patch("/tasks/{task_id}")
